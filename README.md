@@ -34,17 +34,26 @@ NativeLoader.exe TestDLL_x64.bin
 ```
 
 ### Convert DLL with powershell and load with Invoke-Shellcode
-```
+```powershell
 Import-Module .\Invoke-Shellcode.ps1
 Import-Module .\ConvertTo-Shellcode.ps1
 Invoke-Shellcode -Shellcode (ConvertTo-Shellcode -File TestDLL_x64.dll)
 ```
+
 ## Building
 This project is built using Visual Studio 2015 (v140) and Windows SDK 8.1. The python script is written using Python 3.
 
-## Credits
-Naturally none of this project could be complete without the work of others:
+The Python and Powershell scripts are located at:
+- Python\ConvertToShellcode.py
+- PowerShell\ConvertTo-Shellcode.ps1
 
-This project is derived from ["Improved Reflective DLL Injection" from Dan Staples](https://disman.tl/2015/01/30/an-improved-reflective-dll-injection-technique.html) which itself is derived from the original project by [Stephen Fewer](https://github.com/stephenfewer/ReflectiveDLLInjection). 
+After building the project, the other binaries will be located at:
+- bin\NativeLoader.exe
+- bin\DotNetLoader.exe
+- bin\TestDLL_<arch>.dll
+- bin\ShellcodeRDI_<arch>.bin
+
+## Credits
+The basis of this project is derived from ["Improved Reflective DLL Injection" from Dan Staples](https://disman.tl/2015/01/30/an-improved-reflective-dll-injection-technique.html) which itself is derived from the original project by [Stephen Fewer](https://github.com/stephenfewer/ReflectiveDLLInjection). 
 
 The project framework for compiling C code as shellcode is taken from [Mathew Graeber's reasearch "PIC_BindShell"](http://www.exploit-monday.com/2013/08/writing-optimized-windows-shellcode-in-c.html)
