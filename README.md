@@ -14,6 +14,8 @@ This project is comprised of the following elements:
 - **TestDLL:** Example DLL that includes two exported functions for call on Load and after
 
 ## Use Cases / Examples
+Before use, I recommend you become familiar with [Reflective DLL Injection](https://disman.tl/2015/01/30/an-improved-reflective-dll-injection-technique.html) and it's purpose. 
+
 ### Convert DLL to shellcode using python
 ```python
 from ShellcodeRDI import *
