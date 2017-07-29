@@ -8,7 +8,7 @@ sRDI allows for the conversion of DLL files to position independent shellcode. T
 This project is comprised of the following elements:
 - **ShellcodeRDI:** Compiles shellcode for the DLL loader
 - **NativeLoader:** Converts DLL to shellcode if neccesarry, then injects into memory
-- **DotNetLoader:** C# implmentation of NativeLoader
+- **DotNetLoader:** C# implementation of NativeLoader
 - **Python\ConvertToShellcode.py:** Convert DLL to shellcode in place
 - **PowerShell\ConvertTo-Shellcode.ps1:** Convert DLL to shellcode in place
 - **TestDLL:** Example DLL that includes two exported functions for call on Load and after
