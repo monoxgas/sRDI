@@ -1,7 +1,7 @@
 # sRDI
 Shellcode implementation of Reflective DLL Injection. Supports 
 
-sRDI allows for the conversion of DLL files to position independent shellcode. This is accomplished via components:
+sRDI allows for the conversion of DLL files to position independent shellcode. This is accomplished via two components:
 - C project which compiles a PE loader implementation (RDI) to shellcode
 - Conversion code which attaches the DLL, RDI, and user data together with a bootstrap
 
@@ -59,3 +59,5 @@ After building the project, the other binaries will be located at:
 The basis of this project is derived from ["Improved Reflective DLL Injection" from Dan Staples](https://disman.tl/2015/01/30/an-improved-reflective-dll-injection-technique.html) which itself is derived from the original project by [Stephen Fewer](https://github.com/stephenfewer/ReflectiveDLLInjection). 
 
 The project framework for compiling C code as shellcode is taken from [Mathew Graeber's reasearch "PIC_BindShell"](http://www.exploit-monday.com/2013/08/writing-optimized-windows-shellcode-in-c.html)
+
+The [PEFile project](https://github.com/erocarrera/pefile) is used in the python script for parsing.
