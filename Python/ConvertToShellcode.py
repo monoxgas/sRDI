@@ -1,13 +1,24 @@
+import argparse
 from ShellcodeRDI import *
 
-if len(sys.argv) != 2:
-    print('Usage: RDIShellcodePyConverter.py [DLL File]')
-    sys.exit()
+__version__ = '1.0'
 
-print('Creating Shellcode: {}'.format(sys.argv[1].replace('.dll', '.bin')))
-dll = open(sys.argv[1], 'rb').read()
+def main():
+    parser = argparse.ArgumentParser(description='RDI Shellcode Converter', conflict_handler='resolve')
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s Version: ' + __version__)
+    parser.add_argument('input_rdll', help='RDLL to convert to shellcode')
+    parser.add_argument('-f', '--function-name', dest='function_name', default='SayHello', help='The function to call after DllMain')
+    arguments = parser.parse_args()
 
-if len(dll) > 0: convertedDLL = ConvertToShellcode(dll, HashFunctionName("SayHello"))
+    input_rdll = arguments.input_rdll
+    output_bin = input_rdll.replace('.dll', '.bin')
 
-with open(sys.argv[1].replace('.dll', '.bin'), 'wb') as f:
-    f.write(convertedDLL)
+    print('Creating Shellcode: {}'.format(output_bin))
+    dll = open(sys.argv[1], 'rb').read()
+
+    converted_dll = ConvertToShellcode(dll, HashFunctionName(arguments.function_name))
+    with open(output_bin, 'wb') as f:
+        f.write(converted_dll)
+
+if __name__ == '__main__':
+    main()
