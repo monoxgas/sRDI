@@ -507,7 +507,7 @@ public class sRDI
 
             // ret - because we used call earlier
             newShellcode.Add(0xc3);
-            Console.WriteLine(BitConverter.ToString(newShellcode.ToArray()).Replace("-", string.Empty));
+
             //Write the rest of RDI
             foreach (byte b in rdiShellcode)
                 newShellcode.Add(b);
