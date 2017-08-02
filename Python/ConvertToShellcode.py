@@ -14,7 +14,7 @@ def main():
     output_bin = input_rdll.replace('.dll', '.bin')
 
     print('Creating Shellcode: {}'.format(output_bin))
-    dll = open(sys.argv[1], 'rb').read()
+    dll = open(arguments.input_rdll, 'rb').read()
 
     converted_dll = ConvertToShellcode(dll, HashFunctionName(arguments.function_name))
     with open(output_bin, 'wb') as f:
