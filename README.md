@@ -1,7 +1,7 @@
 # sRDI
-Shellcode implementation of Reflective DLL Injection. Supports 
+sRDI allows for the conversion of DLL files to position independent shellcode.
 
-sRDI allows for the conversion of DLL files to position independent shellcode. This is accomplished via two components:
+Functionality is accomplished via two components:
 - C project which compiles a PE loader implementation (RDI) to shellcode
 - Conversion code which attaches the DLL, RDI, and user data together with a bootstrap
 
@@ -12,6 +12,8 @@ This project is comprised of the following elements:
 - **Python\ConvertToShellcode.py:** Convert DLL to shellcode in place
 - **PowerShell\ConvertTo-Shellcode.ps1:** Convert DLL to shellcode in place
 - **TestDLL:** Example DLL that includes two exported functions for call on Load and after
+
+**The DLL does not need to be compiled with RDI, however the technique  is cross compatiable.**
 
 ## Use Cases / Examples
 Before use, I recommend you become familiar with [Reflective DLL Injection](https://disman.tl/2015/01/30/an-improved-reflective-dll-injection-technique.html) and it's purpose. 
