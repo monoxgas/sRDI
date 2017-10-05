@@ -218,7 +218,7 @@
       </Message>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(SolutionDir)lib\PowerShell\Out-Shellcode.ps1 $(OutDir)$(TargetName)$(TargetExt) $(OutDir)$(TargetName).map $(SolutionDir)bin\$(TargetName)_x86.bin</Command>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(SolutionDir)lib\PowerShell\Out-Shellcode.ps1" "$(OutDir)$(TargetName)$(TargetExt)" "$(OutDir)$(TargetName).map" "$(SolutionDir)bin\$(TargetName)_x86.bin"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Extract position independent shellcode</Message>
@@ -382,7 +382,7 @@
       </Message>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(SolutionDir)lib\PowerShell\Out-Shellcode.ps1 $(OutDir)$(TargetName)$(TargetExt) $(OutDir)$(TargetName).map $(SolutionDir)bin\$(TargetName)_x86.bin</Command>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(SolutionDir)lib\PowerShell\Out-Shellcode.ps1" "$(OutDir)$(TargetName)$(TargetExt)" "$(OutDir)$(TargetName).map" "$(SolutionDir)bin\$(TargetName)_x86.bin"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Extract position independent shellcode</Message>
@@ -737,7 +737,7 @@
       <Message>Build AdjustStack.asm</Message>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(SolutionDir)lib\PowerShell\Out-Shellcode.ps1 $(OutDir)$(TargetName)$(TargetExt) $(OutDir)$(TargetName).map $(SolutionDir)bin\$(TargetName)_x64.bin</Command>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(SolutionDir)lib\PowerShell\Out-Shellcode.ps1" "$(OutDir)$(TargetName)$(TargetExt)" "$(OutDir)$(TargetName).map" "$(SolutionDir)bin\$(TargetName)_x64.bin"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Extract position independent shellcode</Message>
