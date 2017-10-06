@@ -13,6 +13,11 @@
     $OutputFile
 )
 
+# PowerShell v2
+if(!$PSScriptRoot){ 
+	$PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent 
+}
+
 . "$PSScriptRoot\Get-PEHeader.ps1"
 
 $PE = Get-PEHeader $InputExe -GetSectionData
