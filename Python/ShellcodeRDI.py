@@ -1,4 +1,10 @@
-import sys, pefile
+import sys
+
+if sys.version_info < (3,0):
+    print("[!] Sorry, requires Python 3.x")
+    sys.exit(1)
+    
+import pefile
 from struct import pack
 
 #define IMAGE_NT_OPTIONAL_HDR32_MAGIC      0x10b
