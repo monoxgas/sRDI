@@ -579,5 +579,8 @@ Function ConvertTo-Shellcode{
 
     $UserDataBytes =  [system.Text.Encoding]::Default.GetBytes($UserData + "\0")
 
-    [sRDI]::ConvertToShellcode($FileData, $FunctionHash, $UserDataBytes)
+    # https://github.com/PowerShell/PowerShell/issues/3313
+    $UintHash = [System.Uint32][System.Convert]::ToUint32($FunctionHash.ToString("X8"), 16)
+    
+    [sRDI]::ConvertToShellcode($FileData, $UintHash, $UserDataBytes)
 }
