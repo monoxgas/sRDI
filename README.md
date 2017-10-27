@@ -1,4 +1,4 @@
-# sRDI
+# sRDI - Shellcode Reflective DLL Injection
 sRDI allows for the conversion of DLL files to position independent shellcode.
 
 Functionality is accomplished via two components:
