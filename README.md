@@ -10,7 +10,9 @@ This project is comprised of the following elements:
 - **NativeLoader:** Converts DLL to shellcode if neccesarry, then injects into memory
 - **DotNetLoader:** C# implementation of NativeLoader
 - **Python\ConvertToShellcode.py:** Convert DLL to shellcode in place
+- **Python\EncodeBlobs.py:** Encodes compiled sRDI blobs for static embedding
 - **PowerShell\ConvertTo-Shellcode.ps1:** Convert DLL to shellcode in place
+- **FunctionTest:** Imports sRDI C function for debug testing
 - **TestDLL:** Example DLL that includes two exported functions for call on Load and after
 
 **The DLL does not need to be compiled with RDI, however the technique  is cross compatiable.**
@@ -43,6 +45,12 @@ Import-Module .\Invoke-Shellcode.ps1
 Import-Module .\ConvertTo-Shellcode.ps1
 Invoke-Shellcode -Shellcode (ConvertTo-Shellcode -File TestDLL_x64.dll)
 ```
+
+## Stealth Considerations
+There are many ways to detect memory injection. The loader function implements two stealth improvments on traditional RDI:
+
+- **Proper Permissions:** When relocating sections, memory permissions are set based on the section characteristics rather than a massive RWX blob.
+- **PE Header Cleaning:** The DOS Header and DOS Stub for the target DLL are completley wiped with null bytes on load. (Except for e_lfanew) 
 
 ## Building
 This project is built using Visual Studio 2015 (v140) and Windows SDK 8.1. The python script is written using Python 3.
