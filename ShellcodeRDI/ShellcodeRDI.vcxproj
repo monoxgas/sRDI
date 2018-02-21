@@ -23,7 +23,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>PIC_Bindshell</RootNamespace>
     <ProjectName>ShellcodeRDI</ProjectName>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -699,18 +699,19 @@
       </Profile>
       <RegisterOutput>
       </RegisterOutput>
-      <AdditionalDependencies>$(IntDir)\AdjustStack.obj</AdditionalDependencies>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
       <AllowIsolation>
       </AllowIsolation>
       <EnableUAC>
       </EnableUAC>
       <GenerateMapFile>true</GenerateMapFile>
-      <FunctionOrder>function_link_order64.txt</FunctionOrder>
+      <FunctionOrder>function_link_order.txt</FunctionOrder>
       <IgnoreEmbeddedIDL>
       </IgnoreEmbeddedIDL>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
-      <EntryPointSymbol>Begin</EntryPointSymbol>
+      <EntryPointSymbol>ExecutePayload</EntryPointSymbol>
       <LinkErrorReporting>
       </LinkErrorReporting>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
@@ -731,10 +732,12 @@
       </VerboseOutput>
     </Manifest>
     <PreBuildEvent>
-      <Command>ml64 /nologo /c /Cx /Fo $(ProjectDir)$(IntDir)AdjustStack.obj $(ProjectDir)AdjustStack.asm</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
     <PreBuildEvent>
-      <Message>Build AdjustStack.asm</Message>
+      <Message>
+      </Message>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(SolutionDir)lib\PowerShell\Out-Shellcode.ps1" "$(OutDir)$(TargetName)$(TargetExt)" "$(OutDir)$(TargetName).map" "$(SolutionDir)bin\$(TargetName)_x64.bin"</Command>
@@ -856,18 +859,19 @@
       </Profile>
       <RegisterOutput>
       </RegisterOutput>
-      <AdditionalDependencies>$(IntDir)\AdjustStack.obj</AdditionalDependencies>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
       <AllowIsolation>
       </AllowIsolation>
       <EnableUAC>
       </EnableUAC>
       <GenerateMapFile>true</GenerateMapFile>
-      <FunctionOrder>function_link_order64.txt</FunctionOrder>
+      <FunctionOrder>function_link_order.txt</FunctionOrder>
       <IgnoreEmbeddedIDL>
       </IgnoreEmbeddedIDL>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
-      <EntryPointSymbol>Begin</EntryPointSymbol>
+      <EntryPointSymbol>ExecutePayload</EntryPointSymbol>
       <LinkErrorReporting>
       </LinkErrorReporting>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
@@ -890,10 +894,12 @@
       </VerboseOutput>
     </Manifest>
     <PreBuildEvent>
-      <Command>ml64 /nologo /c /Cx /Fo $(ProjectDir)$(IntDir)AdjustStack.obj $(ProjectDir)AdjustStack.asm</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
     <PreBuildEvent>
-      <Message>Build AdjustStack.asm</Message>
+      <Message>
+      </Message>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(SolutionDir)lib\PowerShell\Out-Shellcode.ps1 $(OutDir)$(TargetName)$(TargetExt) $(OutDir)$(TargetName).map $(SolutionDir)bin\$(TargetName)_x64.bin</Command>
@@ -903,11 +909,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="64BitHelper.h" />
     <ClInclude Include="GetProcAddressWithHash.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="AdjustStack.asm" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ShellcodeRDI.c" />

@@ -4,10 +4,6 @@
 
 #include "GetProcAddressWithHash.h"
 
-#ifndef TESTING
-#include "64BitHelper.h"
-#endif
-
 #include <windows.h>
 #include <intrin.h>
 
@@ -50,6 +46,8 @@ typedef BOOL(*EXPORTFUNC)(LPVOID, DWORD);
 #define MESSAGEBOXA_HASH				0x7568345
 
 #define HASH_KEY						13
+
+#define SRDI_CLEARHEADER 0x1
 
 #ifdef _WIN64
 #define HOST_MACHINE IMAGE_FILE_MACHINE_AMD64
@@ -156,7 +154,7 @@ AlignValueUp(size_t value, size_t alignment) {
 // Write the logic for the primary payload here
 // Normally, I would call this 'main' but if you call a function 'main', link.exe requires that you link against the CRT
 // Rather, I will pass a linker option of "/ENTRY:ExecutePayload" in order to get around this issue.
-ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen)
+ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen, DWORD flags)
 {
 	#pragma warning( push )
 	#pragma warning( disable : 4055 ) // Ignore cast warnings
@@ -169,7 +167,7 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	NTFLUSHINSTRUCTIONCACHE pNtFlushInstructionCache = NULL;
 	GETNATIVESYSTEMINFO pGetNativeSystemInfo = NULL;
 	VIRTUALPROTECT pVirtualProtect = NULL;
-	//MESSAGEBOXA pMessageBoxA = NULL;
+	MESSAGEBOXA pMessageBoxA = NULL;
 
 	PIMAGE_DATA_DIRECTORY directory = NULL;
 	PIMAGE_EXPORT_DIRECTORY exports = NULL;
@@ -286,7 +284,7 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	uiValueE = FIELD_OFFSET(IMAGE_DOS_HEADER, e_lfanew);
 
 	while (uiValueA--) {
-		if (uiValueD < (uiHeaderValue - uiLibraryAddress) && (uiValueD < uiValueE || uiValueD > (uiValueE + sizeof(WORD)))) {
+		if ((flags & SRDI_CLEARHEADER) && uiValueD < (uiHeaderValue - uiLibraryAddress) && (uiValueD < uiValueE || uiValueD > (uiValueE + sizeof(WORD)))) {
 			// Blow away everything before the NT_HEADERS. Leave e_lfanew;
 			*(BYTE *)uiValueC++ = '\0';
 			uiValueB++;
