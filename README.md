@@ -50,7 +50,7 @@ Invoke-Shellcode -Shellcode (ConvertTo-Shellcode -File TestDLL_x64.dll)
 There are many ways to detect memory injection. The loader function implements two stealth improvments on traditional RDI:
 
 - **Proper Permissions:** When relocating sections, memory permissions are set based on the section characteristics rather than a massive RWX blob.
-- **PE Header Cleaning:** The DOS Header and DOS Stub for the target DLL are completley wiped with null bytes on load. (Except for e_lfanew) 
+- **PE Header Cleaning (Optional):** The DOS Header and DOS Stub for the target DLL are completley wiped with null bytes on load (Except for e_lfanew). This can be toggled with 0x1 in the flags argument for C/C#, or via command line args in Python/Powershell.
 
 ## Building
 This project is built using Visual Studio 2015 (v140) and Windows SDK 8.1. The python script is written using Python 3.
