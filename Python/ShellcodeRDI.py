@@ -63,7 +63,7 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         bootstrap += b'\xe8\x00\x00\x00\x00'
 
         # Set the offset to our DLL from pop result
-        dllOffset = bootstrapSize - len(bootstrap) + len(rdiShellcode);
+        dllOffset = bootstrapSize - len(bootstrap) + len(rdiShellcode)
 
         # pop rcx - Capture our current location in memory
         bootstrap += b'\x59'
@@ -82,7 +82,7 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         # Setup the location of our user data
         # add r8, <Offset of the DLL> + <Length of DLL>
         bootstrap += b'\x49\x81\xc0'
-        userDataLocation = dllOffset + len(dllBytes);
+        userDataLocation = dllOffset + len(dllBytes)
         bootstrap += pack('I', userDataLocation)
 
         # mov r9d, <Length of User Data>
@@ -138,7 +138,7 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         bootstrap += b'\xe8\x00\x00\x00\x00'
 
         # Set the offset to our DLL from pop result
-        dllOffset = bootstrapSize - len(bootstrap) + len(rdiShellcode);
+        dllOffset = bootstrapSize - len(bootstrap) + len(rdiShellcode)
 
         # pop ecx - Capture our current location in memory
         bootstrap += b'\x58'
@@ -152,7 +152,7 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
 
         # add ebx, <Offset to the DLL> + <Size of DLL>
         bootstrap += b'\x81\xc3'
-        userDataLocation = dllOffset + len(dllBytes);
+        userDataLocation = dllOffset + len(dllBytes)
         bootstrap += pack('I', userDataLocation)
 
         # push <Flags>
@@ -191,4 +191,4 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         # User data
         return bootstrap + rdiShellcode + dllBytes + userData
 
-    return False;
+    return False
