@@ -4,13 +4,19 @@ if sys.version_info < (3,0):
     print("[!] Sorry, requires Python 3.x")
     sys.exit(1)
     
-import pefile
+import struct
 from struct import pack
 
-def is64BitDLL(bytes):
-    pe =  pefile.PE(data=bytes, fast_load=True)
-    return (pe.OPTIONAL_HEADER.Magic == 0x20b)
+MACHINE_IA64=512
+MACHINE_AMD64=34404
 
+def is64BitDLL(bytes):
+    header_offset = struct.unpack("<L", bytes[60:64])[0]
+    machine = struct.unpack("<H", bytes[header_offset+4:header_offset+4+2])[0]
+    if machine == MACHINE_IA64 or machine == MACHINE_AMD64:
+        return True   
+    return False
+    
 ror = lambda val, r_bits, max_bits: \
     ((val & (2**max_bits-1)) >> r_bits%max_bits) | \
     (val << (max_bits-(r_bits%max_bits)) & (2**max_bits-1))
