@@ -27,9 +27,11 @@ typedef VOID(WINAPI * EXITTHREAD)(DWORD);
 typedef DWORD(NTAPI  * NTFLUSHINSTRUCTIONCACHE)(HANDLE, PVOID, ULONG);
 typedef VOID(WINAPI * GETNATIVESYSTEMINFO)(LPSYSTEM_INFO);
 typedef BOOL(WINAPI * VIRTUALPROTECT)(LPVOID, SIZE_T, DWORD, PDWORD);
-typedef int (WINAPI *MESSAGEBOXA)(HWND, LPSTR, LPSTR, UINT);
+typedef int (WINAPI * MESSAGEBOXA)(HWND, LPSTR, LPSTR, UINT);
+typedef BOOL(WINAPI * VIRTUALFREE)(LPVOID, SIZE_T, DWORD);
+typedef BOOL(WINAPI * LOCALFREE)(LPVOID);
 
-typedef BOOL(*EXPORTFUNC)(LPVOID, DWORD);
+typedef BOOL(* EXPORTFUNC)(LPVOID, DWORD);
 
 /** NOTE: module hashes are computed using all-caps unicode strings */
 #define KERNEL32DLL_HASH				0x6A4ABC5B
@@ -44,10 +46,13 @@ typedef BOOL(*EXPORTFUNC)(LPVOID, DWORD);
 #define GETNATIVESYSTEMINFO_HASH	    0x959e0033
 #define VIRTUALPROTECT_HASH				0xc38ae110
 #define MESSAGEBOXA_HASH				0x7568345
+#define LOCALFREE_HASH					0xea61fcb1			
+#define VIRTUALFREE_HASH				0x300f2f0b
 
 #define HASH_KEY						13
 
 #define SRDI_CLEARHEADER 0x1
+#define SRDI_CLEARMEMORY 0x2
 
 #ifdef _WIN64
 #define HOST_MACHINE IMAGE_FILE_MACHINE_AMD64
@@ -167,6 +172,8 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	NTFLUSHINSTRUCTIONCACHE pNtFlushInstructionCache = NULL;
 	GETNATIVESYSTEMINFO pGetNativeSystemInfo = NULL;
 	VIRTUALPROTECT pVirtualProtect = NULL;
+	VIRTUALFREE pVirtualFree = NULL;
+	LOCALFREE pLocalFree = NULL;
 	MESSAGEBOXA pMessageBoxA = NULL;
 
 	PIMAGE_DATA_DIRECTORY directory = NULL;
@@ -272,9 +279,12 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	if (alignedImageSize != AlignValueUp(lastSectionEnd, sysInfo.dwPageSize))
 		return 0;
 
-	// allocate all the memory for the DLL to be loaded into. We are going to relocate anyways.
+	// allocate all the memory for the DLL to be loaded into. Attempt to use the preffered base address
 	// Also zeros all memory and marks it as READ and WRITE.
-	uiBaseAddress = (ULONG_PTR)pVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	uiBaseAddress = (ULONG_PTR)pVirtualAlloc(((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.ImageBase, ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+	if (uiBaseAddress == 0)
+		uiBaseAddress = (ULONG_PTR)pVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 	// we must now copy over the headers
 	uiValueA = ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfHeaders;
@@ -395,53 +405,56 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	// STEP 5: process all of our images relocations
 	///
 
-	// calculate the base address delta and perform relocations (even if we load at desired image base)
+	// calculate the base address delta and perform relocations (assuming we missed the preferred address)
 	uiLibraryAddress = uiBaseAddress - ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.ImageBase;
 
-	// uiValueB = the address of the relocation directory
-	uiValueB = (ULONG_PTR)&((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
-	
-	// check if their are any relocations present
-	if (((PIMAGE_DATA_DIRECTORY)uiValueB)->Size)
-	{
-		// uiValueC is now the first entry (IMAGE_BASE_RELOCATION)
-		uiValueC = (uiBaseAddress + ((PIMAGE_DATA_DIRECTORY)uiValueB)->VirtualAddress);
+	if (uiLibraryAddress != 0) {
+		// uiValueB = the address of the relocation directory
+		uiValueB = (ULONG_PTR)&((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
 
-		// and we itterate through all entries...
-		while (((PIMAGE_BASE_RELOCATION)uiValueC)->SizeOfBlock)
+		// check if their are any relocations present
+		if (((PIMAGE_DATA_DIRECTORY)uiValueB)->Size)
 		{
-			// uiValueA = the VA for this relocation block
-			uiValueA = (uiBaseAddress + ((PIMAGE_BASE_RELOCATION)uiValueC)->VirtualAddress);
+			// uiValueC is now the first entry (IMAGE_BASE_RELOCATION)
+			uiValueC = (uiBaseAddress + ((PIMAGE_DATA_DIRECTORY)uiValueB)->VirtualAddress);
 
-			// uiValueB = number of entries in this relocation block
-			uiValueB = (((PIMAGE_BASE_RELOCATION)uiValueC)->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(IMAGE_RELOC);
-
-			// uiValueD is now the first entry in the current relocation block
-			uiValueD = uiValueC + sizeof(IMAGE_BASE_RELOCATION);
-
-			// we itterate through all the entries in the current block...
-			while (uiValueB--)
+			// and we itterate through all entries...
+			while (((PIMAGE_BASE_RELOCATION)uiValueC)->SizeOfBlock)
 			{
-				// perform the relocation, skipping IMAGE_REL_BASED_ABSOLUTE as required.
-				// we dont use a switch statement to avoid the compiler building a jump table
-				// which would not be very position independent!
-				if (((PIMAGE_RELOC)uiValueD)->type == IMAGE_REL_BASED_DIR64)
-					*(ULONG_PTR *)(uiValueA + ((PIMAGE_RELOC)uiValueD)->offset) += uiLibraryAddress;
-				else if (((PIMAGE_RELOC)uiValueD)->type == IMAGE_REL_BASED_HIGHLOW)
-					*(DWORD *)(uiValueA + ((PIMAGE_RELOC)uiValueD)->offset) += (DWORD)uiLibraryAddress;
-				else if (((PIMAGE_RELOC)uiValueD)->type == IMAGE_REL_BASED_HIGH)
-					*(WORD *)(uiValueA + ((PIMAGE_RELOC)uiValueD)->offset) += HIWORD(uiLibraryAddress);
-				else if (((PIMAGE_RELOC)uiValueD)->type == IMAGE_REL_BASED_LOW)
-					*(WORD *)(uiValueA + ((PIMAGE_RELOC)uiValueD)->offset) += LOWORD(uiLibraryAddress);
+				// uiValueA = the VA for this relocation block
+				uiValueA = (uiBaseAddress + ((PIMAGE_BASE_RELOCATION)uiValueC)->VirtualAddress);
 
-				// get the next entry in the current relocation block
-				uiValueD += sizeof(IMAGE_RELOC);
+				// uiValueB = number of entries in this relocation block
+				uiValueB = (((PIMAGE_BASE_RELOCATION)uiValueC)->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(IMAGE_RELOC);
+
+				// uiValueD is now the first entry in the current relocation block
+				uiValueD = uiValueC + sizeof(IMAGE_BASE_RELOCATION);
+
+				// we itterate through all the entries in the current block...
+				while (uiValueB--)
+				{
+					// perform the relocation, skipping IMAGE_REL_BASED_ABSOLUTE as required.
+					// we dont use a switch statement to avoid the compiler building a jump table
+					// which would not be very position independent!
+					if (((PIMAGE_RELOC)uiValueD)->type == IMAGE_REL_BASED_DIR64)
+						*(ULONG_PTR *)(uiValueA + ((PIMAGE_RELOC)uiValueD)->offset) += uiLibraryAddress;
+					else if (((PIMAGE_RELOC)uiValueD)->type == IMAGE_REL_BASED_HIGHLOW)
+						*(DWORD *)(uiValueA + ((PIMAGE_RELOC)uiValueD)->offset) += (DWORD)uiLibraryAddress;
+					else if (((PIMAGE_RELOC)uiValueD)->type == IMAGE_REL_BASED_HIGH)
+						*(WORD *)(uiValueA + ((PIMAGE_RELOC)uiValueD)->offset) += HIWORD(uiLibraryAddress);
+					else if (((PIMAGE_RELOC)uiValueD)->type == IMAGE_REL_BASED_LOW)
+						*(WORD *)(uiValueA + ((PIMAGE_RELOC)uiValueD)->offset) += LOWORD(uiLibraryAddress);
+
+					// get the next entry in the current relocation block
+					uiValueD += sizeof(IMAGE_RELOC);
+				}
+
+				// get the next entry in the relocation directory
+				uiValueC = uiValueC + ((PIMAGE_BASE_RELOCATION)uiValueC)->SizeOfBlock;
 			}
-
-			// get the next entry in the relocation directory
-			uiValueC = uiValueC + ((PIMAGE_BASE_RELOCATION)uiValueC)->SizeOfBlock;
 		}
 	}
+	
 
 	///
 	// STEP 6: Finalize our sections. Set memory protections.
@@ -555,6 +568,13 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 
 			dwExitCode = 0;
 		} while (0);
+	}
+
+	if (flags & SRDI_CLEARMEMORY) {
+		uiValueA = pVirtualFree(uiLibraryAddress, 0, 0x8000);
+
+		if (!uiValueA)
+			pLocalFree(uiLibraryAddress);
 	}
 
 	return uiBaseAddress; //Atempt to return a handle to the module
