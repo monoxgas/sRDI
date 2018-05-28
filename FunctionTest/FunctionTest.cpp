@@ -60,7 +60,7 @@ int main()
 		return 1;
 	}
 
-	ExecutePayload((ULONG_PTR)buffer, HashFunctionName("SayHello"), NULL, 0);
+	ExecutePayload((ULONG_PTR)buffer, HashFunctionName("SayHello"), NULL, 0, 0x0);
 
     return 0;
 }
