@@ -38,7 +38,7 @@ DWORD HashFunctionName(LPSTR name) {
 	return hash;
 }
 
-extern "C" ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen);
+extern "C" ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen, DWORD flags);
 
 int main()
 {
