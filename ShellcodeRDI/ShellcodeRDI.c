@@ -174,7 +174,7 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	VIRTUALPROTECT pVirtualProtect = NULL;
 	VIRTUALFREE pVirtualFree = NULL;
 	LOCALFREE pLocalFree = NULL;
-	MESSAGEBOXA pMessageBoxA = NULL;
+	//MESSAGEBOXA pMessageBoxA = NULL;
 
 	PIMAGE_DATA_DIRECTORY directory = NULL;
 	PIMAGE_EXPORT_DIRECTORY exports = NULL;
@@ -275,16 +275,24 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	}
 
 	pGetNativeSystemInfo(&sysInfo);
-	alignedImageSize = AlignValueUp(((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, sysInfo.dwPageSize);
+	alignedImageSize = (DWORD)AlignValueUp(((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, sysInfo.dwPageSize);
 	if (alignedImageSize != AlignValueUp(lastSectionEnd, sysInfo.dwPageSize))
 		return 0;
 
 	// allocate all the memory for the DLL to be loaded into. Attempt to use the preffered base address
 	// Also zeros all memory and marks it as READ and WRITE.
-	uiBaseAddress = (ULONG_PTR)pVirtualAlloc(((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.ImageBase, ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	uiBaseAddress = (ULONG_PTR)pVirtualAlloc(
+		(LPVOID)(((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.ImageBase),
+		((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, 
+		MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE
+	);
 
 	if (uiBaseAddress == 0)
-		uiBaseAddress = (ULONG_PTR)pVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+		uiBaseAddress = (ULONG_PTR)pVirtualAlloc(
+			NULL, 
+			((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage,
+			MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE
+		);
 
 	// we must now copy over the headers
 	uiValueA = ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfHeaders;
@@ -325,9 +333,19 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 		// copy the section over
 		uiValueD = ((PIMAGE_SECTION_HEADER)uiValueA)->SizeOfRawData;
 
-		while (uiValueD--)
-			*(BYTE *)uiValueB++ = *(BYTE *)uiValueC++;
+		if (uiValueD == 0) {
+			// If the seciton is empty, fill in a zeroed block of X (section alignment) size
 
+			uiValueD = ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SectionAlignment;
+
+			while (uiValueD--)
+				*(BYTE *)uiValueB++ = 0x00;
+		}
+		else {
+			while (uiValueD--)
+				*(BYTE *)uiValueB++ = *(BYTE *)uiValueC++;
+		}
+			
 		// get the VA of the next section
 		uiValueA += sizeof(IMAGE_SECTION_HEADER);
 	}
@@ -520,7 +538,6 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 
 	((DLLMAIN)uiValueA)((HINSTANCE)uiBaseAddress, DLL_PROCESS_ATTACH, (LPVOID)1);
 
-
 	///
 	// STEP 8: call our exported function
 	///
@@ -571,10 +588,10 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	}
 
 	if (flags & SRDI_CLEARMEMORY) {
-		uiValueA = pVirtualFree(uiLibraryAddress, 0, 0x8000);
+		uiValueA = pVirtualFree((LPVOID)uiLibraryAddress, 0, 0x8000);
 
 		if (!uiValueA)
-			pLocalFree(uiLibraryAddress);
+			pLocalFree((LPVOID)uiLibraryAddress);
 	}
 
 	return uiBaseAddress; //Atempt to return a handle to the module
