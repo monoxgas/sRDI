@@ -479,14 +479,6 @@ public class sRDI
             foreach (byte b in rdiShellcode)
                 newShellcode.Add(b);
 
-            // Write our DLL
-            foreach (byte b in dllBytes)
-                newShellcode.Add(b);
-
-            // Write our userdata
-            foreach (byte b in userData)
-                newShellcode.Add(b);
-
         }
         else // 32 Bit
         {
@@ -561,19 +553,20 @@ public class sRDI
             //Write the rest of RDI
             foreach (byte b in rdiShellcode)
                 newShellcode.Add(b);
-
-            //Write our DLL
-            dllBytes[0] = 0x00;
-            dllBytes[1] = 0x00;
-            foreach (byte b in dllBytes)
-                newShellcode.Add(b);
-
-            //Write our userdata
-            foreach (byte b in userData)
-                newShellcode.Add(b);
         }
         
-        return newShellcode.ToArray();
+        byte[] finalBytes = newShellcode.ToArray();
+        Array.Resize(ref finalBytes, finalBytes.Length + dllBytes.Length + userData.Length);
+
+        //Write our DLL
+        dllBytes[0] = 0x00;
+        dllBytes[1] = 0x00;
+        Buffer.BlockCopy(dllBytes, 0, finalBytes, newShellcode.Count, dllBytes.Length);
+
+        //Write our userdata
+        Buffer.BlockCopy(userData, 0, finalBytes, newShellcode.Count + dllBytes.Length, userData.Length);
+
+        return finalBytes;
     }
 }
 "@
@@ -630,7 +623,7 @@ Function ConvertTo-Shellcode{
     $Parameters.CompilerOptions += "/unsafe"
     Add-Type -TypeDefinition $Source -Language CSharp -CompilerParameters $Parameters
 
-    $FileData = Get-Content $File -Encoding Byte
+    $FileData = [System.IO.File]::ReadAllBytes($File)
 
     $UserDataBytes =  [system.Text.Encoding]::Default.GetBytes($UserData)
 
