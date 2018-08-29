@@ -33,6 +33,12 @@ extern "C" __declspec(dllexport) BOOL SayGoodbye(LPVOID lpUserdata, DWORD nUserd
 
 extern "C" __declspec(dllexport) BOOL SayHello(LPVOID lpUserdata, DWORD nUserdataLen)
 {
-	return MessageBoxA(NULL, "I'm alive!", "Hello", 0);
+	if (nUserdataLen) {
+		LPSTR greeting = (LPSTR)malloc(10 + nUserdataLen);
+		sprintf(greeting, "Hello %s!", lpUserdata);
+		MessageBoxA(NULL, greeting, "Hello", 0);
+	}
+	else
+		return MessageBoxA(NULL, "I'm alive!", "Hello", 0);
 }
 

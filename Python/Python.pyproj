@@ -28,8 +28,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ConvertToShellcode.py" />
+    <Compile Include="EncodeBlobs.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="pefile.py" />
     <Compile Include="peutils.py" />
+    <Compile Include="ShellcodeRDI.py" />
   </ItemGroup>
   <!-- Uncomment the CoreCompile target to enable the Build command in
        Visual Studio and specify your pre- and post-build commands in
