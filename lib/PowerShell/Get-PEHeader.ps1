@@ -564,7 +564,9 @@ PROCESS {
         $UnsafeNativeMethods = $SystemAssembly.GetType('Microsoft.Win32.UnsafeNativeMethods')
         # Get a reference to the GetModuleHandle and GetProcAddress methods
         $GetModuleHandle = $UnsafeNativeMethods.GetMethod('GetModuleHandle')
-        $GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress')
+        #Fix For Windows 10 1803. Probably should check version , but meh.
+        $GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress', [Type[]]@([System.Runtime.InteropServices.HandleRef], [String]))
+        #$GetProcAddress = $UnsafeNativeMethods.GetMethod('GetProcAddress')
         # Get a handle to the module specified
         $Kern32Handle = $GetModuleHandle.Invoke($null, @($Module))
         $tmpPtr = New-Object IntPtr
