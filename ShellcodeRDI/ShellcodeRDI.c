@@ -320,7 +320,7 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	// uiValueA = the VA of the first section
 	uiValueA = ((ULONG_PTR)&((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader + ((PIMAGE_NT_HEADERS)uiHeaderValue)->FileHeader.SizeOfOptionalHeader);
 
-	// itterate through all sections, loading them into memory.
+	// iterate through all sections, loading them into memory.
 	uiValueE = ((PIMAGE_NT_HEADERS)uiHeaderValue)->FileHeader.NumberOfSections;
 	while (uiValueE--)
 	{
@@ -526,8 +526,35 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 		uiValueA += sizeof(IMAGE_SECTION_HEADER);
 	}
 
+
 	///
-	// STEP 7: call our images entry point
+	// STEP 7: execute TLS callbacks
+	///
+
+	// uiValueB = the address of the TLS directory
+	uiValueB = (ULONG_PTR)&((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
+
+	// check if their are any TLS callbacks required
+	if (((PIMAGE_DATA_DIRECTORY)uiValueB)->VirtualAddress)
+	{
+		// uiValueC is the TLS directory
+		uiValueC = (uiBaseAddress + ((PIMAGE_DATA_DIRECTORY)uiValueB)->VirtualAddress);
+		PIMAGE_TLS_DIRECTORY test = (PIMAGE_TLS_DIRECTORY)uiValueC;
+
+		// uiValueD is the first callback entry
+		uiValueD = (PIMAGE_TLS_CALLBACK *)((PIMAGE_TLS_DIRECTORY)uiValueC)->AddressOfCallBacks;
+		PIMAGE_TLS_CALLBACK * test2 = (PIMAGE_TLS_CALLBACK *)uiValueD;
+
+		if (uiValueD) {
+			while (*(PIMAGE_TLS_CALLBACK *)uiValueD) {
+				(*(PIMAGE_TLS_CALLBACK *)uiValueD)((LPVOID)uiBaseAddress, DLL_PROCESS_ATTACH, NULL);
+				(PIMAGE_TLS_CALLBACK *)uiValueD++;
+			}
+		}
+	}
+
+	///
+	// STEP 8: call our images entry point
 	///
 
 	// uiValueA = the VA of our newly loaded DLL/EXE's entry point
@@ -542,7 +569,7 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 	((DLLMAIN)uiValueA)((HINSTANCE)uiBaseAddress, DLL_PROCESS_ATTACH, (LPVOID)1);
 
 	///
-	// STEP 8: call our exported function
+	// STEP 9: call our exported function
 	///
 	if (dwFunctionHash) {
 		

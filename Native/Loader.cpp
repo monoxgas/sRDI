@@ -266,7 +266,7 @@ BOOL ConvertToShellcode(LPVOID inBytes, DWORD length, DWORD userFunction, LPVOID
 
 		if (rdiShellcode == NULL || rdiShellcodeLength == 0) return 0;
 
-		BYTE bootstrap[45] = { 0 };
+		BYTE bootstrap[46] = { 0 };
 		DWORD i = 0;
 
 		// call next instruction (Pushes next instruction address to stack)
@@ -281,6 +281,13 @@ BOOL ConvertToShellcode(LPVOID inBytes, DWORD length, DWORD userFunction, LPVOID
 
 		// pop eax - Capture our current location in memory
 		bootstrap[i++] = 0x58;
+
+		// push ebp
+		bootstrap[i++] = 0x55;
+
+		// move ebp, esp
+		bootstrap[i++] = 0x89;
+		bootstrap[i++] = 0xe5;
 
 		// mov ebx, eax - copy our location in memory to ebx before we start modifying eax
 		bootstrap[i++] = 0x89;
@@ -327,9 +334,12 @@ BOOL ConvertToShellcode(LPVOID inBytes, DWORD length, DWORD userFunction, LPVOID
 		bootstrap[i++] = 0x00;
 
 		// add esp, 0x14 - correct the stack pointer
-		bootstrap[i++] = 0x83;
-		bootstrap[i++] = 0xc4;
-		bootstrap[i++] = 0x14;
+		//bootstrap[i++] = 0x83;
+		//bootstrap[i++] = 0xc4;
+		//bootstrap[i++] = 0x14;
+
+		// leave
+		bootstrap[i++] = 0xc9;
 
 		// ret - return to caller
 		bootstrap[i++] = 0xc3;
