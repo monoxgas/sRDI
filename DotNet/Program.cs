@@ -673,7 +673,7 @@ namespace RDIShellcodeLoader
             else // 32 Bit
             {
                 var rdiShellcode = rdiShellcode32;
-                int bootstrapSize = 45;
+                int bootstrapSize = 46;
 
                 // call next instruction (Pushes next instruction address to stack)
                 newShellcode.Add(0xe8);
@@ -685,8 +685,15 @@ namespace RDIShellcodeLoader
                 // Set the offset to our DLL from pop result
                 dllOffset = (uint)(bootstrapSize - newShellcode.Count + rdiShellcode.Length);
 
-                // pop ecx - Capture our current location in memory
+                // pop eax - Capture our current location in memory
                 newShellcode.Add(0x58);
+
+                // push ebp
+                newShellcode.Add(0x55);
+
+                // mov ebp, esp
+                newShellcode.Add(0x89);                
+                newShellcode.Add(0xe5);
 
                 // mov ebx, eax - copy our location in memory to ebx before we start modifying eax
                 newShellcode.Add(0x89);
@@ -731,10 +738,8 @@ namespace RDIShellcodeLoader
                 newShellcode.Add(0x00);
                 newShellcode.Add(0x00);
 
-                // add esp, 0x14 - correct the stack pointer
-                newShellcode.Add(0x83);
-                newShellcode.Add(0xc4);
-                newShellcode.Add(0x14);
+                // leave
+                newShellcode.Add(0xc9);
 
                 // ret - return to caller
                 newShellcode.Add(0xc3);

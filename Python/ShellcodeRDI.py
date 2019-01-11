@@ -127,6 +127,9 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         # ret - return to caller
         bootstrap += b'\xc3'
 
+        if len(bootstrap) != bootstrapSize:
+            raise Exception("x64 bootstrap length: {} != bootstrapSize: {}".format(len(bootstrap), bootstrapSize))
+
         # Ends up looking like this in memory:
         # Bootstrap shellcode
         # RDI shellcode
@@ -138,7 +141,7 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         rdiShellcode = rdiShellcode32
 
         bootstrap = b''
-        bootstrapSize = 45
+        bootstrapSize = 46
 
         # call next instruction (Pushes next instruction address to stack)
         bootstrap += b'\xe8\x00\x00\x00\x00'
@@ -146,8 +149,14 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         # Set the offset to our DLL from pop result
         dllOffset = bootstrapSize - len(bootstrap) + len(rdiShellcode)
 
-        # pop ecx - Capture our current location in memory
+        # pop eax - Capture our current location in memory
         bootstrap += b'\x58'
+
+        # push ebp
+        bootstrap += b'\x55'
+
+        # mov ebp, esp
+        bootstrap += b'\x89\xe5'
 
         # mov ebx, eax - copy our location in memory to ebx before we start modifying eax
         bootstrap += b'\x89\xc3'
@@ -184,11 +193,14 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         bootstrap += pack('b', bootstrapSize - len(bootstrap) - 4) # Skip over the remainder of instructions
         bootstrap += b'\x00\x00\x00'
 
-        # add esp, 0x14 - correct the stack pointer
-        bootstrap += b'\x83\xc4\x14'
+        # leave
+        bootstrap += b'\xc9'
 
         # ret - return to caller
         bootstrap += b'\xc3'
+
+        if len(bootstrap) != bootstrapSize:
+            raise Exception("x86 bootstrap length: {} != bootstrapSize: {}".format(len(bootstrap), bootstrapSize))
 
         # Ends up looking like this in memory:
         # Bootstrap shellcode
