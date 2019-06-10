@@ -526,6 +526,8 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 		uiValueA += sizeof(IMAGE_SECTION_HEADER);
 	}
 
+	// We must flush the instruction cache to avoid stale code being used which was updated by our relocation processing.
+	pNtFlushInstructionCache((HANDLE)-1, NULL, 0);
 
 	///
 	// STEP 7: execute TLS callbacks
@@ -559,9 +561,6 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 
 	// uiValueA = the VA of our newly loaded DLL/EXE's entry point
 	uiValueA = (uiBaseAddress + ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.AddressOfEntryPoint);
-
-	// We must flush the instruction cache to avoid stale code being used which was updated by our relocation processing.
-	pNtFlushInstructionCache((HANDLE)-1, NULL, 0);
 
 	// call our respective entry point, fudging our hInstance value
 	// if we are injecting a DLL via LoadRemoteLibraryR we call DllMain and pass in our parameter (via the DllMain lpReserved parameter)
