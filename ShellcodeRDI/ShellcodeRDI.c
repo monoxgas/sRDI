@@ -333,18 +333,7 @@ ULONG_PTR ExecutePayload(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOI
 		// copy the section over
 		uiValueD = ((PIMAGE_SECTION_HEADER)uiValueA)->SizeOfRawData;
 
-		if (uiValueD == 0) {
-			/// Currently will cause memset to get linked
-
-			//// If the seciton is empty, fill in a zeroed block of X (section alignment) size
-
-			//uiValueD = ((PIMAGE_NT_HEADERS)uiHeaderValue)->OptionalHeader.SectionAlignment;
-
-			//while (uiValueD--)
-			//	// Silly trick to avoid the optimized link to memset.
-			//	*(BYTE *)uiValueB++ = 0x00;
-		}
-		else {
+		if (uiValueD != 0) {
 			while (uiValueD--)	
 				*(BYTE *)uiValueB++ = *(BYTE *)uiValueC++;
 		}
