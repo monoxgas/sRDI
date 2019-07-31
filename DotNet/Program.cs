@@ -467,7 +467,7 @@ namespace RDIShellcodeLoader
             IntPtr scPointer = scHandle.AddrOfPinnedObject();
 
             Int32 headerOffset = Marshal.ReadInt32(scPointer, 60);
-            UInt16 magic = (UInt16)Marshal.ReadInt16(scPointer, 60 + headerOffset);
+            UInt16 magic = (UInt16)Marshal.ReadInt16(scPointer, headerOffset + 4);
 
             if (magic == (UInt16)512 || magic == (UInt16)34404)
                 is64Bit = true;
