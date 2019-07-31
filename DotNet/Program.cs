@@ -462,20 +462,15 @@ namespace RDIShellcodeLoader
         public static unsafe bool Is64BitDLL(byte[] dllBytes)
         {
             bool is64Bit = false;
+
             GCHandle scHandle = GCHandle.Alloc(dllBytes, GCHandleType.Pinned);
             IntPtr scPointer = scHandle.AddrOfPinnedObject();
 
-            IMAGE_DOS_HEADER dosHeader = (IMAGE_DOS_HEADER)Marshal.PtrToStructure(scPointer, typeof(IMAGE_DOS_HEADER));
+            Int32 headerOffset = Marshal.ReadInt32(scPointer, 60);
+            UInt16 magic = (UInt16)Marshal.ReadInt16(scPointer, 60 + headerOffset);
 
-            IntPtr NtHeadersPtr = (IntPtr)((UInt64)scPointer + (UInt64)dosHeader.e_lfanew);
-
-            var imageNtHeaders64 = (IMAGE_NT_HEADERS64)Marshal.PtrToStructure(NtHeadersPtr, typeof(IMAGE_NT_HEADERS64));
-            var imageNtHeaders32 = (IMAGE_NT_HEADERS)Marshal.PtrToStructure(NtHeadersPtr, typeof(IMAGE_NT_HEADERS));
-
-            if (imageNtHeaders64.Signature != 0x00004550)
-                throw new ApplicationException("Invalid IMAGE_NT_HEADER signature.");
-
-            if (imageNtHeaders64.OptionalHeader.Magic == MagicType.IMAGE_NT_OPTIONAL_HDR64_MAGIC) is64Bit = true;
+            if (magic == (UInt16)512 || magic == (UInt16)34404)
+                is64Bit = true;
 
             scHandle.Free();
 
@@ -547,6 +542,26 @@ namespace RDIShellcodeLoader
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate bool ExportedFunction(IntPtr userData, uint userLength);
+
+        public static uint Ror(uint val, int r_bits, int max_bits)
+        {
+            return (val >> r_bits) | (val << (max_bits - r_bits));
+        }
+
+        public static uint HashFunction(string name)
+        {
+            uint functionHash = 0;
+
+            name += "\x00";
+
+            foreach (char c in name)
+            {
+                functionHash = Ror(functionHash, 13, 32);
+                functionHash += c;
+            }
+
+            return functionHash;
+        }
 
         public static byte[] ConvertToShellcode(byte[] dllBytes, uint functionHash, byte[] userData, uint flags)
         {
@@ -789,8 +804,7 @@ namespace RDIShellcodeLoader
 
             if (data[0] == 'M' && data[1] == 'Z')
             {
-                // 0x30627745 - 'SayHello' - FunctionToHash.py
-                shellcode = ConvertToShellcode(data, 0x30627745, userData, 0);
+                shellcode = ConvertToShellcode(data, HashFunction("SayHello"), userData, 0);
 
                 Console.WriteLine("[+] Converted DLL to shellcode");
             }

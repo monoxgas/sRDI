@@ -6,369 +6,51 @@ using System.Reflection;
 
 public class sRDI
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    struct IMAGE_DATA_DIRECTORY
-    {
-        public uint VirtualAddress;
-        public uint Size;
-    }
-
-    //[StructLayout(LayoutKind.Sequential, Pack = 1)]
-    [StructLayout(LayoutKind.Explicit)]
-    unsafe struct IMAGE_SECTION_HEADER
-    {
-        [FieldOffset(0)]
-        public fixed byte Name[8];
-        [FieldOffset(8)]
-        public uint PhysicalAddress;
-        [FieldOffset(8)]
-        public uint VirtualSize;
-        [FieldOffset(12)]
-        public uint VirtualAddress;
-        [FieldOffset(16)]
-        public uint SizeOfRawData;
-        [FieldOffset(20)]
-        public uint PointerToRawData;
-        [FieldOffset(24)]
-        public uint PointerToRelocations;
-        [FieldOffset(28)]
-        public uint PointerToLinenumbers;
-        [FieldOffset(32)]
-        public ushort NumberOfRelocations;
-        [FieldOffset(34)]
-        public ushort NumberOfLinenumbers;
-        [FieldOffset(36)]
-        public uint Characteristics;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    struct IMAGE_FILE_HEADER
-    {
-        public ushort Machine;
-        public ushort NumberOfSections;
-        public uint TimeDateStamp;
-        public uint PointerToSymbolTable;
-        public uint NumberOfSymbols;
-        public ushort SizeOfOptionalHeader;
-        public ushort Characteristics;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    struct IMAGE_EXPORT_DIRECTORY
-    {
-        public uint Characteristics;
-        public uint TimeDateStamp;
-        public ushort MajorVersion;
-        public ushort MinorVersion;
-        public uint Name;
-        public uint Base;
-        public uint NumberOfFunctions;
-        public uint NumberOfNames;
-        public uint AddressOfFunctions;     // RVA from base of image
-        public uint AddressOfNames;         // RVA from base of image
-        public uint AddressOfNameOrdinals;  // RVA from base of image
-    }
-
-    enum IMAGE_DOS_SIGNATURE : ushort
-    {
-        DOS_SIGNATURE = 0x5A4D,      // MZ
-        OS2_SIGNATURE = 0x454E,      // NE
-        OS2_SIGNATURE_LE = 0x454C,      // LE
-    }
-
-    enum MagicType : ushort
-    {
-        IMAGE_NT_OPTIONAL_HDR32_MAGIC = 0x10b,
-        IMAGE_NT_OPTIONAL_HDR64_MAGIC = 0x20b,
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    struct IMAGE_DOS_HEADER
-    {
-        public IMAGE_DOS_SIGNATURE e_magic;        // Magic number
-        public ushort e_cblp;                      // public bytes on last page of file
-        public ushort e_cp;                        // Pages in file
-        public ushort e_crlc;                      // Relocations
-        public ushort e_cparhdr;                   // Size of header in paragraphs
-        public ushort e_minalloc;                  // Minimum extra paragraphs needed
-        public ushort e_maxalloc;                  // Maximum extra paragraphs needed
-        public ushort e_ss;                        // Initial (relative) SS value
-        public ushort e_sp;                        // Initial SP value
-        public ushort e_csum;                      // Checksum
-        public ushort e_ip;                        // Initial IP value
-        public ushort e_cs;                        // Initial (relative) CS value
-        public ushort e_lfarlc;                    // File address of relocation table
-        public ushort e_ovno;                      // Overlay number
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 8)]
-        public string e_res;                       // May contain 'Detours!'
-        public ushort e_oemid;                     // OEM identifier (for e_oeminfo)
-        public ushort e_oeminfo;                   // OEM information; e_oemid specific
-        [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 10)]
-        public ushort[] e_res2;                      // Reserved public ushorts
-        public Int32 e_lfanew;                    // File address of new exe header
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    struct IMAGE_OPTIONAL_HEADER
-    {
-        //
-        // Standard fields.
-        //
-
-        public MagicType Magic;
-        public byte MajorLinkerVersion;
-        public byte MinorLinkerVersion;
-        public uint SizeOfCode;
-        public uint SizeOfInitializedData;
-        public uint SizeOfUninitializedData;
-        public uint AddressOfEntryPoint;
-        public uint BaseOfCode;
-        public uint BaseOfData;
-        public uint ImageBase;
-        public uint SectionAlignment;
-        public uint FileAlignment;
-        public ushort MajorOperatingSystemVersion;
-        public ushort MinorOperatingSystemVersion;
-        public ushort MajorImageVersion;
-        public ushort MinorImageVersion;
-        public ushort MajorSubsystemVersion;
-        public ushort MinorSubsystemVersion;
-        public uint Win32VersionValue;
-        public uint SizeOfImage;
-        public uint SizeOfHeaders;
-        public uint CheckSum;
-        public ushort Subsystem;
-        public ushort DllCharacteristics;
-        public uint SizeOfStackReserve;
-        public uint SizeOfStackCommit;
-        public uint SizeOfHeapReserve;
-        public uint SizeOfHeapCommit;
-        public uint LoaderFlags;
-        public uint NumberOfRvaAndSizes;
-        public IMAGE_DATA_DIRECTORY ExportTable;
-        public IMAGE_DATA_DIRECTORY ImportTable;
-        public IMAGE_DATA_DIRECTORY ResourceTable;
-        public IMAGE_DATA_DIRECTORY ExceptionTable;
-        public IMAGE_DATA_DIRECTORY CertificateTable;
-        public IMAGE_DATA_DIRECTORY BaseRelocationTable;
-        public IMAGE_DATA_DIRECTORY Debug;
-        public IMAGE_DATA_DIRECTORY Architecture;
-        public IMAGE_DATA_DIRECTORY GlobalPtr;
-        public IMAGE_DATA_DIRECTORY TLSTable;
-        public IMAGE_DATA_DIRECTORY LoadConfigTable;
-        public IMAGE_DATA_DIRECTORY BoundImport;
-        public IMAGE_DATA_DIRECTORY IAT;
-        public IMAGE_DATA_DIRECTORY DelayImportDescriptor;
-        public IMAGE_DATA_DIRECTORY CLRRuntimeHeader;
-        public IMAGE_DATA_DIRECTORY Public;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    struct IMAGE_OPTIONAL_HEADER64
-    {
-        public MagicType Magic;
-        public byte MajorLinkerVersion;
-        public byte MinorLinkerVersion;
-        public uint SizeOfCode;
-        public uint SizeOfInitializedData;
-        public uint SizeOfUninitializedData;
-        public uint AddressOfEntryPoint;
-        public uint BaseOfCode;
-        public ulong ImageBase;
-        public uint SectionAlignment;
-        public uint FileAlignment;
-        public ushort MajorOperatingSystemVersion;
-        public ushort MinorOperatingSystemVersion;
-        public ushort MajorImageVersion;
-        public ushort MinorImageVersion;
-        public ushort MajorSubsystemVersion;
-        public ushort MinorSubsystemVersion;
-        public uint Win32VersionValue;
-        public uint SizeOfImage;
-        public uint SizeOfHeaders;
-        public uint CheckSum;
-        public ushort Subsystem;
-        public ushort DllCharacteristics;
-        public ulong SizeOfStackReserve;
-        public ulong SizeOfStackCommit;
-        public ulong SizeOfHeapReserve;
-        public ulong SizeOfHeapCommit;
-        public uint LoaderFlags;
-        public uint NumberOfRvaAndSizes;
-        public IMAGE_DATA_DIRECTORY ExportTable;
-        public IMAGE_DATA_DIRECTORY ImportTable;
-        public IMAGE_DATA_DIRECTORY ResourceTable;
-        public IMAGE_DATA_DIRECTORY ExceptionTable;
-        public IMAGE_DATA_DIRECTORY CertificateTable;
-        public IMAGE_DATA_DIRECTORY BaseRelocationTable;
-        public IMAGE_DATA_DIRECTORY Debug;
-        public IMAGE_DATA_DIRECTORY Architecture;
-        public IMAGE_DATA_DIRECTORY GlobalPtr;
-        public IMAGE_DATA_DIRECTORY TLSTable;
-        public IMAGE_DATA_DIRECTORY LoadConfigTable;
-        public IMAGE_DATA_DIRECTORY BoundImport;
-        public IMAGE_DATA_DIRECTORY IAT;
-        public IMAGE_DATA_DIRECTORY DelayImportDescriptor;
-        public IMAGE_DATA_DIRECTORY CLRRuntimeHeader;
-        public IMAGE_DATA_DIRECTORY Public;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    struct IMAGE_NT_HEADERS64
-    {
-        public uint Signature;
-        public IMAGE_FILE_HEADER FileHeader;
-        public IMAGE_OPTIONAL_HEADER64 OptionalHeader;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    struct IMAGE_NT_HEADERS
-    {
-        public uint Signature;
-        public IMAGE_FILE_HEADER FileHeader;
-        public IMAGE_OPTIONAL_HEADER OptionalHeader;
-    }
-
-    public static unsafe class InteropTools
-    {
-        private static readonly Type SafeBufferType = typeof(SafeBuffer);
-        public delegate void PtrToStructureNativeDelegate(byte* ptr, TypedReference structure, uint sizeofT);
-        public delegate void StructureToPtrNativeDelegate(TypedReference structure, byte* ptr, uint sizeofT);
-        const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
-        private static readonly MethodInfo PtrToStructureNativeMethod = SafeBufferType.GetMethod("PtrToStructureNative", flags);
-        private static readonly MethodInfo StructureToPtrNativeMethod = SafeBufferType.GetMethod("StructureToPtrNative", flags);
-        public static readonly PtrToStructureNativeDelegate PtrToStructureNative = (PtrToStructureNativeDelegate)Delegate.CreateDelegate(typeof(PtrToStructureNativeDelegate), PtrToStructureNativeMethod);
-        public static readonly StructureToPtrNativeDelegate StructureToPtrNative = (StructureToPtrNativeDelegate)Delegate.CreateDelegate(typeof(StructureToPtrNativeDelegate), StructureToPtrNativeMethod);
-
-        private static readonly Func<Type, bool, int> SizeOfHelper_f = (Func<Type, bool, int>)Delegate.CreateDelegate(typeof(Func<Type, bool, int>), typeof(Marshal).GetMethod("SizeOfHelper", flags));
-
-        public static void StructureToPtrDirect(TypedReference structure, IntPtr ptr, int size)
-        {
-            StructureToPtrNative(structure, (byte*)ptr, unchecked((uint)size));
-        }
-
-        public static void StructureToPtrDirect(TypedReference structure, IntPtr ptr)
-        {
-            StructureToPtrDirect(structure, ptr, SizeOf(__reftype(structure)));
-        }
-
-        public static void PtrToStructureDirect(IntPtr ptr, TypedReference structure, int size)
-        {
-            PtrToStructureNative((byte*)ptr, structure, unchecked((uint)size));
-        }
-
-        public static void PtrToStructureDirect(IntPtr ptr, TypedReference structure)
-        {
-            PtrToStructureDirect(ptr, structure, SizeOf(__reftype(structure)));
-        }
-
-        public static void StructureToPtr<T>(ref T structure, IntPtr ptr)
-        {
-            StructureToPtrDirect(__makeref(structure), ptr);
-        }
-
-        public static void PtrToStructure<T>(IntPtr ptr, out T structure)
-        {
-            structure = default(T);
-            PtrToStructureDirect(ptr, __makeref(structure));
-        }
-
-        public static T PtrToStructure<T>(IntPtr ptr)
-        {
-            T obj;
-            PtrToStructure(ptr, out obj);
-            return obj;
-        }
-
-        public static int SizeOf<T>(T structure)
-        {
-            return SizeOf<T>();
-        }
-
-        public static int SizeOf<T>()
-        {
-            return SizeOf(typeof(T));
-        }
-
-        public static int SizeOf(Type t)
-        {
-            return SizeOfHelper_f(t, true);
-        }
-    }
-
-    public static IntPtr Rva2Offset(uint dwRva, IntPtr PEPointer)
-    {
-        bool is64Bit = false;
-        ushort wIndex = 0;
-        ushort wNumberOfSections = 0;
-        IntPtr imageSectionPtr;
-        IMAGE_SECTION_HEADER SectionHeader;
-        int sizeOfSectionHeader = Marshal.SizeOf(typeof(IMAGE_SECTION_HEADER));
-
-        IMAGE_DOS_HEADER dosHeader = InteropTools.PtrToStructure<IMAGE_DOS_HEADER>(PEPointer);
-
-        IntPtr NtHeadersPtr = (IntPtr)((UInt64)PEPointer + (UInt64)dosHeader.e_lfanew);
-
-        var imageNtHeaders32 = (IMAGE_NT_HEADERS)Marshal.PtrToStructure(NtHeadersPtr, typeof(IMAGE_NT_HEADERS));
-        var imageNtHeaders64 = (IMAGE_NT_HEADERS64)Marshal.PtrToStructure(NtHeadersPtr, typeof(IMAGE_NT_HEADERS64));
-
-        if (imageNtHeaders64.OptionalHeader.Magic == MagicType.IMAGE_NT_OPTIONAL_HDR64_MAGIC) is64Bit = true;
-
-
-        if (is64Bit)
-        {
-            imageSectionPtr = (IntPtr)(((Int64)NtHeadersPtr + (Int64)Marshal.OffsetOf(typeof(IMAGE_NT_HEADERS64), "OptionalHeader") + (Int64)imageNtHeaders64.FileHeader.SizeOfOptionalHeader));
-            SectionHeader = (IMAGE_SECTION_HEADER)Marshal.PtrToStructure(imageSectionPtr, typeof(IMAGE_SECTION_HEADER));
-            wNumberOfSections = imageNtHeaders64.FileHeader.NumberOfSections;
-        }
-        else
-        {
-            imageSectionPtr = (IntPtr)(((Int64)NtHeadersPtr + (Int64)Marshal.OffsetOf(typeof(IMAGE_NT_HEADERS), "OptionalHeader") + (Int64)imageNtHeaders32.FileHeader.SizeOfOptionalHeader));
-            SectionHeader = (IMAGE_SECTION_HEADER)Marshal.PtrToStructure(imageSectionPtr, typeof(IMAGE_SECTION_HEADER));
-            wNumberOfSections = imageNtHeaders32.FileHeader.NumberOfSections;
-        }
-
-        if (dwRva < SectionHeader.PointerToRawData)
-            return (IntPtr)((UInt64)dwRva + (UInt64)PEPointer);
-
-        for (wIndex = 0; wIndex < wNumberOfSections; wIndex++)
-        {
-            SectionHeader = (IMAGE_SECTION_HEADER)Marshal.PtrToStructure((IntPtr)((uint)imageSectionPtr + (uint)(sizeOfSectionHeader * (wIndex))), typeof(IMAGE_SECTION_HEADER));
-            if (dwRva >= SectionHeader.VirtualAddress && dwRva < (SectionHeader.VirtualAddress + SectionHeader.SizeOfRawData))
-                return (IntPtr)((UInt64)(dwRva - SectionHeader.VirtualAddress + SectionHeader.PointerToRawData) + (UInt64)PEPointer);
-        }
-
-        return IntPtr.Zero;
-    }
-
-    public static unsafe bool Is64BitDLL(byte[] dllBytes)
-    {
-        bool is64Bit = false;
-        GCHandle scHandle = GCHandle.Alloc(dllBytes, GCHandleType.Pinned);
-        IntPtr scPointer = scHandle.AddrOfPinnedObject();
-
-        IMAGE_DOS_HEADER dosHeader = (IMAGE_DOS_HEADER)Marshal.PtrToStructure(scPointer, typeof(IMAGE_DOS_HEADER));
-
-        IntPtr NtHeadersPtr = (IntPtr)((UInt64)scPointer + (UInt64)dosHeader.e_lfanew);
-
-        var imageNtHeaders64 = (IMAGE_NT_HEADERS64)Marshal.PtrToStructure(NtHeadersPtr, typeof(IMAGE_NT_HEADERS64));
-        var imageNtHeaders32 = (IMAGE_NT_HEADERS)Marshal.PtrToStructure(NtHeadersPtr, typeof(IMAGE_NT_HEADERS));
-
-        if (imageNtHeaders64.Signature != 0x00004550)
-            throw new ApplicationException("Invalid IMAGE_NT_HEADER signature.");
-
-        if (imageNtHeaders64.OptionalHeader.Magic == MagicType.IMAGE_NT_OPTIONAL_HDR64_MAGIC) is64Bit = true;
-
-        scHandle.Free();
-
-        return is64Bit;
-    }
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     delegate IntPtr ReflectiveLoader();
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate bool ExportedFunction(IntPtr userData, uint userLength);
+
+    static uint Ror(uint val, int r_bits, int max_bits)
+    {
+        return (val >> r_bits) | (val << (max_bits - r_bits));
+    }
+
+    public static uint HashFunction(string name)
+    {
+        uint functionHash = 0;
+
+        name += "\x00";
+
+        foreach (char c in name)
+        {
+            functionHash = Ror(functionHash, 13, 32);
+            functionHash += c;
+        }
+
+        return functionHash;
+    }
+
+    static unsafe bool Is64BitDLL(byte[] dllBytes)
+    {
+        bool is64Bit = false;
+
+        GCHandle scHandle = GCHandle.Alloc(dllBytes, GCHandleType.Pinned);
+        IntPtr scPointer = scHandle.AddrOfPinnedObject();
+
+        Int32 headerOffset = Marshal.ReadInt32(scPointer, 60);
+        UInt16 magic = (UInt16)Marshal.ReadInt16(scPointer, 60 + headerOffset);
+
+        if (magic == (UInt16)512 || magic == (UInt16)34404)
+            is64Bit = true;
+
+        scHandle.Free();
+
+        return is64Bit;
+    }
+
 
     public static byte[] ConvertToShellcode(byte[] dllBytes, uint functionHash, byte[] userData, uint flags)
     {
@@ -596,14 +278,17 @@ Function ConvertTo-Shellcode{
     C:\PS> ConvertTo-Shellcode -File TestDLL_x86.dll
 
     .EXAMPLE
+    C:\PS> ConvertTo-Shellcode -File MyTool.dll -FunctionName "MyExport" -UserData "MyDataForMyExport"
+
+    .EXAMPLE
     C:\PS> import-module .\Invoke-Shellcode.ps1
     C:\PS> Invoke-Shellcode -Shellcode (ConvertTo-Shellcode TestDLL_x64.dll -ClearHeader)
 
     .PARAMETER File
     The target DLL file to convert
 
-    .PARAMETER FunctionHash
-    Hashed name of the function to call after DLLMain
+    .PARAMETER FunctionName
+    Name of the exported function to call after DLLMain
 
     .PARAMETER UserData
     Data to pass to the target function
@@ -617,7 +302,7 @@ Function ConvertTo-Shellcode{
       [string] $File,
 
       [Parameter(Position=2)]
-      [int] $FunctionHash = 0x30627745,
+      [string] $FunctionName = "SayHello",
 
       [Parameter(Position=3)]
       [string] $UserData = "dave",
@@ -630,18 +315,14 @@ Function ConvertTo-Shellcode{
     Add-Type -TypeDefinition $Source -Language CSharp -CompilerParameters $Parameters
 
     $FileData = [System.IO.File]::ReadAllBytes($File)
-
     $UserDataBytes =  [system.Text.Encoding]::Default.GetBytes($UserData)
+    $FunctionHash = [sRDI]::HashFunction($FunctionName);
 
-    # https://github.com/PowerShell/PowerShell/issues/3313
-    $UintHash = [System.Uint32][System.Convert]::ToUint32($FunctionHash.ToString("X8"), 16)
-    
     $Flags = 0
 
     if($ClearHeader){
         $Flags = ($Flags -bor 0x1)
     }
 
-    [sRDI]::ConvertToShellcode($FileData, $UintHash, $UserDataBytes, $Flags)
-    
+    return [Byte[]][sRDI]::ConvertToShellcode($FileData, $FunctionHash, $UserDataBytes, $Flags)
 }
