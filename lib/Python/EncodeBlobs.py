@@ -17,8 +17,8 @@ DotNetTemplate = """
             """
 
 PythonTemplate = """
-    rdiShellcode32 = "{}"
-    rdiShellcode64 = "{}"
+    rdiShellcode32 = b'{}'
+    rdiShellcode64 = b'{}'
     """
 
 def main():
