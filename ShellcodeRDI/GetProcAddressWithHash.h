@@ -28,7 +28,7 @@ typedef struct _MY_LDR_DATA_TABLE_ENTRY
 	UNICODE_STRING BaseDllName;
 } MY_LDR_DATA_TABLE_ENTRY, *PMY_LDR_DATA_TABLE_ENTRY;
 
-HMODULE GetProcAddressWithHash( _In_ DWORD dwModuleFunctionHash )
+HMODULE GetProcAddressWithHash( DWORD dwModuleFunctionHash )
 {
 	PPEB PebAddress;
 	PMY_PEB_LDR_DATA pLdr;
@@ -50,11 +50,6 @@ HMODULE GetProcAddressWithHash( _In_ DWORD dwModuleFunctionHash )
 
 #if defined(_WIN64)
 	PebAddress = (PPEB) __readgsqword( 0x60 );
-#elif defined(_M_ARM)
-	// I can assure you that this is not a mistake. The C compiler improperly emits the proper opcodes
-	// necessary to get the PEB.Ldr address
-	PebAddress = (PPEB) ( (ULONG_PTR) _MoveFromCoprocessor(15, 0, 13, 0, 2) + 0);
-	__emit( 0x00006B1B );
 #else
 	PebAddress = (PPEB) __readfsdword( 0x30 );
 #endif

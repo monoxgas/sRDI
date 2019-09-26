@@ -8,9 +8,9 @@
 #include <winternl.h>
 #include <intrin.h>
 
-// we declare some common stuff in here...
-
-#define DLL_QUERY_HMODULE		6
+#define SRDI_CLEARHEADER 0x1
+#define SRDI_CLEARMEMORY 0x2
+#define SRDI_OBFUSCATEIMPORTS 0x4
 
 #define DEREF( name )*(UINT_PTR *)(name)
 #define DEREF_64( name )*(DWORD64 *)(name)
@@ -33,12 +33,9 @@
 #define MESSAGEBOXA_HASH				0x7568345
 #define LOCALFREE_HASH					0xea61fcb1			
 #define VIRTUALFREE_HASH				0x300f2f0b
+#define SLEEP_HASH						0xe035f044
 
 #define HASH_KEY						13
-
-#define SRDI_CLEARHEADER 0x1
-#define SRDI_CLEARMEMORY 0x2
-#define SRDI_OBFUSCATEIMPORTS 0x4
 
 #ifdef _WIN64
 #define HOST_MACHINE IMAGE_FILE_MACHINE_AMD64
@@ -46,6 +43,8 @@
 #define HOST_MACHINE IMAGE_FILE_MACHINE_I386
 #endif
 
+// 100-ns period
+#define OBFUSCATE_IMPORT_DELAY 5 * 1000 * 10000
 
 typedef BOOL(WINAPI * DLLMAIN)(HINSTANCE, DWORD, LPVOID);
 typedef BOOL(*EXPORTFUNC)(LPVOID, DWORD);
@@ -60,6 +59,8 @@ typedef BOOL(WINAPI * VIRTUALPROTECT)(LPVOID, SIZE_T, DWORD, PDWORD);
 typedef int (WINAPI * MESSAGEBOXA)(HWND, LPSTR, LPSTR, UINT);
 typedef BOOL(WINAPI * VIRTUALFREE)(LPVOID, SIZE_T, DWORD);
 typedef BOOL(WINAPI * LOCALFREE)(LPVOID);
+typedef VOID(WINAPI* SLEEP)(DWORD);
+
 
 #define RVA(type, base, rva) (type)((ULONG_PTR) base + rva)
 
@@ -91,6 +92,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	VIRTUALPROTECT pVirtualProtect = NULL;
 	VIRTUALFREE pVirtualFree = NULL;
 	LOCALFREE pLocalFree = NULL;
+	SLEEP pSleep = NULL;
 	/// MESSAGEBOXA pMessageBoxA = NULL;
 
 	// PE data
@@ -125,13 +127,21 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	DWORD lastSectionEnd;
 	DWORD endOfSection;
 	DWORD alignedImageSize;
-	ULONGLONG baseOffset;
+	ULONG_PTR baseOffset;
 	SYSTEM_INFO sysInfo;
 
 	// General
 	PBYTE libraryAddress;
 	DWORD funcHash;
-	
+	DWORD importCount;
+
+	// Import obfuscation
+	DWORD randSeed;
+	DWORD rand;
+	DWORD sleep;
+	DWORD selection;
+	IMAGE_IMPORT_DESCRIPTOR tempDesc;
+
 	// Relocated base
 	ULONG_PTR baseAddress;
 
@@ -147,14 +157,14 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	pVirtualProtect = (VIRTUALPROTECT)GetProcAddressWithHash(VIRTUALPROTECT_HASH);
 	pNtFlushInstructionCache = (NTFLUSHINSTRUCTIONCACHE)GetProcAddressWithHash(NTFLUSHINSTRUCTIONCACHE_HASH);
 	pGetNativeSystemInfo = (GETNATIVESYSTEMINFO)GetProcAddressWithHash(GETNATIVESYSTEMINFO_HASH);
+	pSleep = (SLEEP)GetProcAddressWithHash(SLEEP_HASH);
 	/// pMessageBoxA = (MESSAGEBOXA)GetProcAddressWithHash(MESSAGEBOXA_HASH);
 
 	if (!pLoadLibraryA || !pGetProcAddress || !pVirtualAlloc || !pVirtualProtect || 
-		!pNtFlushInstructionCache || !pGetNativeSystemInfo) {
+		!pNtFlushInstructionCache || !pGetNativeSystemInfo || !pSleep) {
 		return 0;
 	}
 	
-
 	///
 	// STEP 2: load our image into a new permanent location in memory
 	///
@@ -196,7 +206,6 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 		return 0;
 	}
 		
-
 	// Allocate all the memory for the DLL to be loaded into. Attempt to use the preferred base address.
 
 	baseAddress = (ULONG_PTR)pVirtualAlloc(
@@ -228,8 +237,6 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 		}
 	}
 
-
-
 	ntHeaders = RVA(PIMAGE_NT_HEADERS, baseAddress, ((PIMAGE_DOS_HEADER)baseAddress)->e_lfanew);
 	
 	///
@@ -249,12 +256,34 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	///
 
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+	randSeed = (DWORD)dllData;
 
 	if (dataDir->Size) {
+
 		importDesc = RVA(PIMAGE_IMPORT_DESCRIPTOR, baseAddress, dataDir->VirtualAddress);
-
+		importCount = 0;
 		for (; importDesc->Name; importDesc++) {
+			importCount++;
+		}
 
+		importDesc = RVA(PIMAGE_IMPORT_DESCRIPTOR, baseAddress, dataDir->VirtualAddress);
+		if (flags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
+			sleep = (flags & 0xFFFF0000);
+			sleep = sleep >> 16;
+
+			for (i = 0; i < importCount - 1; i++) {
+				randSeed = (214013 * randSeed + 2531011);
+				rand = (randSeed >> 16) & 0x7FFF;
+				selection = i + rand / (32767 / (importCount - i) + 1);
+
+				tempDesc = importDesc[selection];
+				importDesc[selection] = importDesc[i];
+				importDesc[i] = tempDesc;
+			}
+		}
+
+		importDesc = RVA(PIMAGE_IMPORT_DESCRIPTOR, baseAddress, dataDir->VirtualAddress);
+		for (; importDesc->Name; importDesc++) {
 			libraryAddress = (PBYTE)pLoadLibraryA((LPCSTR)(baseAddress + importDesc->Name));
 			firstThunk = RVA(PIMAGE_THUNK_DATA, baseAddress, importDesc->FirstThunk);
 			origFirstThunk = RVA(PIMAGE_THUNK_DATA, baseAddress, importDesc->OriginalFirstThunk);
@@ -263,12 +292,16 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 			for (; origFirstThunk->u1.Function; firstThunk++, origFirstThunk++) {
 
 				if (IMAGE_SNAP_BY_ORDINAL(origFirstThunk->u1.Ordinal)) {
-					firstThunk->u1.Function = (ULONGLONG)pGetProcAddress((HMODULE)libraryAddress, (LPCSTR)IMAGE_ORDINAL(origFirstThunk->u1.Ordinal));
+					firstThunk->u1.Function = (ULONG_PTR)pGetProcAddress((HMODULE)libraryAddress, (LPCSTR)IMAGE_ORDINAL(origFirstThunk->u1.Ordinal));
 				}
 				else {
 					importByName = RVA(PIMAGE_IMPORT_BY_NAME, baseAddress, origFirstThunk->u1.AddressOfData);
-					firstThunk->u1.Function = (ULONGLONG)pGetProcAddress((HMODULE)libraryAddress, importByName->Name);
+					firstThunk->u1.Function = (ULONG_PTR)pGetProcAddress((HMODULE)libraryAddress, importByName->Name);
 				}
+			}
+
+			if (flags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
+				pSleep(sleep * 1000);
 			}
 		}
 	}
@@ -291,11 +324,11 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 			// iterate through all imported functions, importing by ordinal if no name present
 			for (; firstThunk->u1.Function; firstThunk++, origFirstThunk++) {
 				if (IMAGE_SNAP_BY_ORDINAL(origFirstThunk->u1.Ordinal)) {
-					firstThunk->u1.Function = (ULONGLONG)pGetProcAddress((HMODULE)libraryAddress, (LPCSTR)IMAGE_ORDINAL(origFirstThunk->u1.Ordinal));
+					firstThunk->u1.Function = (ULONG_PTR)pGetProcAddress((HMODULE)libraryAddress, (LPCSTR)IMAGE_ORDINAL(origFirstThunk->u1.Ordinal));
 				}
 				else {
 					importByName = RVA(PIMAGE_IMPORT_BY_NAME, baseAddress, origFirstThunk->u1.AddressOfData);
-					firstThunk->u1.Function = (ULONGLONG)pGetProcAddress((HMODULE)libraryAddress, importByName->Name);
+					firstThunk->u1.Function = (ULONG_PTR)pGetProcAddress((HMODULE)libraryAddress, importByName->Name);
 				}
 			}
 		}
@@ -378,7 +411,6 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 
 	}
 
-
 	// We must flush the instruction cache to avoid stale code being used
 	pNtFlushInstructionCache((HANDLE)-1, NULL, 0);
 
@@ -386,8 +418,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	// STEP 8: execute TLS callbacks
 	///
 
-
-	baseOffset = (ULONGLONG)(baseAddress - ntHeaders->OptionalHeader.ImageBase);
+	baseOffset = (ULONG_PTR)(baseAddress - ntHeaders->OptionalHeader.ImageBase);
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
 
 	if (dataDir->Size)

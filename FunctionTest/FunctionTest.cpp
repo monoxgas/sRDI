@@ -5,6 +5,10 @@
 #include <Windows.h>
 #include <string>
 
+#define SRDI_CLEARHEADER 0x1
+#define SRDI_CLEARMEMORY 0x2
+#define SRDI_OBFUSCATEIMPORTS 0x4
+
 DWORD GetFileContents(LPCSTR filename, LPSTR *data, DWORD &size)
 {
 	std::FILE *fp = std::fopen(filename, "rb");
@@ -50,7 +54,7 @@ int main()
 #ifdef _WIN64
 	LPCSTR fileName = "../bin/TestDLL_x64.dll";
 #else
-	LPCSTR fileName = "../../bin/TestDLL_x86.dll";
+	LPCSTR fileName = "../bin/TestDLL_x86.dll";
 #endif
 
 	DWORD result = GetFileContents(fileName, &buffer, bufferSize);
@@ -60,7 +64,12 @@ int main()
 		return 1;
 	}
 
-	LoadDLL((ULONG_PTR)buffer, HashFunctionName("SayHello"), NULL, 0, 0x1);
+	LoadDLL(
+		(ULONG_PTR)buffer,
+		HashFunctionName("SayHello"),
+		NULL, 0, 
+		SRDI_CLEARHEADER | SRDI_CLEARMEMORY | SRDI_OBFUSCATEIMPORTS | (3 << 16)
+	);
 
     return 0;
 }
