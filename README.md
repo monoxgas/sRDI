@@ -1,5 +1,5 @@
 # sRDI - Shellcode Reflective DLL Injection
-sRDI allows for the conversion of DLL files to position independent shellcode.
+sRDI allows for the conversion of DLL files to position independent shellcode. It attempts to be a fully functional PE loader supporting proper section permissions, TLS callbacks, and sanity checks. It can be thought of as a shellcode PE loader strapped to a packed DLL.
 
 Functionality is accomplished via two components:
 - C project which compiles a PE loader implementation (RDI) to shellcode
@@ -46,24 +46,26 @@ Import-Module .\ConvertTo-Shellcode.ps1
 Invoke-Shellcode -Shellcode (ConvertTo-Shellcode -File TestDLL_x64.dll)
 ```
 
-## Stealth Considerations
-There are many ways to detect memory injection. The loader function implements two stealth improvments on traditional RDI:
+## Flags
+The PE loader code uses `flags` argument to control the various options of loading logic:
 
-- **Proper Permissions:** When relocating sections, memory permissions are set based on the section characteristics rather than a massive RWX blob.
-- **PE Header Cleaning (Optional):** The DOS Header and DOS Stub for the target DLL are completley wiped with null bytes on load (Except for e_lfanew). This can be toggled with 0x1 in the flags argument for C/C#, or via command line args in Python/Powershell.
+- `SRDI_CLEARHEADER` [0x1]: The DOS Header and DOS Stub for the target DLL are completley wiped with null bytes on load (Except for e_lfanew). This might cause issues with stock windows APIs when supplying the base address as a psuedo `HMODULE`.
+- `SRDI_CLEARMEMORY` [0x2]: After calling functions in the loaded module (`DllMain` and any exports), the DLL data will be cleared from memory. This is dangerous if you expect to continue executing code out of the module (Threads / `GetProcAddressR`).
+- `SRDI_OBFUSCATEIMPORTS` [0x4]: The order of imports in the module will be randomized before starting IAT patching. Additionally, the high 16 bits of the flag can be used to store the number of seconds to pause before processing the next import. For example, `flags | (3 << 16)` will pause 3 seconds between every import.
+
 
 ## Building
 This project is built using Visual Studio 2015 (v140) and Windows SDK 8.1. The python script is written using Python 3.
 
 The Python and Powershell scripts are located at:
-- Python\ConvertToShellcode.py
-- PowerShell\ConvertTo-Shellcode.ps1
+- `Python\ConvertToShellcode.py`
+- `PowerShell\ConvertTo-Shellcode.ps1`
 
 After building the project, the other binaries will be located at:
-- bin\NativeLoader.exe
-- bin\DotNetLoader.exe
-- bin\TestDLL_<arch>.dll
-- bin\ShellcodeRDI_<arch>.bin
+- `bin\NativeLoader.exe`
+- `bin\DotNetLoader.exe`
+- `bin\TestDLL_<arch>.dll`
+- `bin\ShellcodeRDI_<arch>.bin`
 
 ## Credits
 The basis of this project is derived from ["Improved Reflective DLL Injection" from Dan Staples](https://disman.tl/2015/01/30/an-improved-reflective-dll-injection-technique.html) which itself is derived from the original project by [Stephen Fewer](https://github.com/stephenfewer/ReflectiveDLLInjection). 

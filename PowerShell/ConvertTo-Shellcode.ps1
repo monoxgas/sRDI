@@ -292,8 +292,14 @@ Function ConvertTo-Shellcode{
     .PARAMETER UserData
     Data to pass to the target function
 
-    .PARAMETER DeleteHeader
+    .PARAMETER ClearHeader
     Clear the PE header on load
+
+    .PARAMETER ObfuscateImports
+    Randomize import dependency load order
+
+    .PARAMETER ImportDelay
+    Number of seconds to pause between loading imports (requires -ObfuscateImports)
     #>
     [CmdletBinding()]
     Param(
@@ -306,7 +312,10 @@ Function ConvertTo-Shellcode{
       [Parameter(Position=3)]
       [string] $UserData = "dave",
 
-      [switch] $ClearHeader      
+      [switch] $ClearHeader,
+
+      [switch] $ObfuscateImports,
+      [int] $ImportDelay = 0 
     )
 
     $Parameters = New-Object System.CodeDom.Compiler.CompilerParameters
@@ -321,6 +330,14 @@ Function ConvertTo-Shellcode{
 
     if($ClearHeader){
         $Flags = ($Flags -bor 0x1)
+    }
+
+    if($ObfuscateImports){
+        # bitshift the delay into the high 16 bits
+        $Delay = $ImportDelay * [math]::pow(2, 16)
+
+        # bitwise or the 0x4 flag and the shifted delay
+        $Flags = (($Flags -bor 0x4) -bor $Delay)
     }
 
     return [Byte[]][sRDI]::ConvertToShellcode($FileData, $FunctionHash, $UserDataBytes, $Flags)
