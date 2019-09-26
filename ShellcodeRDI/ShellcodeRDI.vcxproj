@@ -191,7 +191,7 @@
       <FunctionOrder>function_link_order.txt</FunctionOrder>
       <IgnoreEmbeddedIDL />
       <DataExecutionPrevention />
-      <EntryPointSymbol>ExecutePayload</EntryPointSymbol>
+      <EntryPointSymbol>LoadDLL</EntryPointSymbol>
       <LinkErrorReporting />
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
@@ -711,7 +711,7 @@
       </IgnoreEmbeddedIDL>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
-      <EntryPointSymbol>ExecutePayload</EntryPointSymbol>
+      <EntryPointSymbol>LoadDLL</EntryPointSymbol>
       <LinkErrorReporting>
       </LinkErrorReporting>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
