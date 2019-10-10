@@ -127,8 +127,7 @@
       </PreprocessorDefinitions>
       <CompileAs>CompileAsC</CompileAs>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
-      <OmitFramePointers>
-      </OmitFramePointers>
+      <OmitFramePointers>true</OmitFramePointers>
       <OmitDefaultLibName>true</OmitDefaultLibName>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -191,7 +190,7 @@
       <FunctionOrder>function_link_order.txt</FunctionOrder>
       <IgnoreEmbeddedIDL />
       <DataExecutionPrevention />
-      <EntryPointSymbol>ExecutePayload</EntryPointSymbol>
+      <EntryPointSymbol>LoadDLL</EntryPointSymbol>
       <LinkErrorReporting />
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
@@ -601,8 +600,7 @@
       </PreprocessorDefinitions>
       <CompileAs>CompileAsC</CompileAs>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
-      <OmitFramePointers>
-      </OmitFramePointers>
+      <OmitFramePointers>true</OmitFramePointers>
       <OmitDefaultLibName>true</OmitDefaultLibName>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -667,7 +665,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>
@@ -711,7 +709,7 @@
       </IgnoreEmbeddedIDL>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
-      <EntryPointSymbol>ExecutePayload</EntryPointSymbol>
+      <EntryPointSymbol>LoadDLL</EntryPointSymbol>
       <LinkErrorReporting>
       </LinkErrorReporting>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
