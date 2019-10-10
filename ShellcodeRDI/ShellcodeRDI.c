@@ -424,9 +424,9 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	if (dataDir->Size)
 	{
 		tlsDir = RVA(PIMAGE_TLS_DIRECTORY, baseAddress, dataDir->VirtualAddress);
-		callback = RVA(PIMAGE_TLS_CALLBACK *, baseAddress, tlsDir->AddressOfCallBacks);
+		callback = (PIMAGE_TLS_CALLBACK *)(tlsDir->AddressOfCallBacks);
 		
-		for (; callback; callback++) {
+		for (; *callback; callback++) {
 			(*callback)((LPVOID)baseAddress, DLL_PROCESS_ATTACH, NULL);
 		}
 	}
