@@ -250,9 +250,40 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 			((PBYTE)(baseAddress + sectionHeader->VirtualAddress))[c] = ((PBYTE)(dllData + sectionHeader->PointerToRawData))[c];
 		}
 	}
-	
+
 	///
-	// STEP 4: process our import table
+	// STEP 4: process all of our images relocations (assuming we missed the preferred address)
+	///
+
+	baseOffset = baseAddress - ntHeaders->OptionalHeader.ImageBase;
+	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+	if (baseOffset && dataDir->Size) {
+
+		relocation = RVA(PIMAGE_BASE_RELOCATION, baseAddress, dataDir->VirtualAddress);
+
+		while (relocation->VirtualAddress) {
+			relocList = (PIMAGE_RELOC)(relocation + 1);
+
+			while ((PBYTE)relocList != (PBYTE)relocation + relocation->SizeOfBlock) {
+
+				if (relocList->type == IMAGE_REL_BASED_DIR64)
+					*(PULONG_PTR)((PBYTE)baseAddress + relocation->VirtualAddress + relocList->offset) += baseOffset;
+				else if (relocList->type == IMAGE_REL_BASED_HIGHLOW)
+					*(PULONG_PTR)((PBYTE)baseAddress + relocation->VirtualAddress + relocList->offset) += (DWORD)baseOffset;
+				else if (relocList->type == IMAGE_REL_BASED_HIGH)
+					*(PULONG_PTR)((PBYTE)baseAddress + relocation->VirtualAddress + relocList->offset) += HIWORD(baseOffset);
+				else if (relocList->type == IMAGE_REL_BASED_LOW)
+					*(PULONG_PTR)((PBYTE)baseAddress + relocation->VirtualAddress + relocList->offset) += LOWORD(baseOffset);
+
+				relocList++;
+			}
+			relocation = (PIMAGE_BASE_RELOCATION)relocList;
+		}
+	}
+
+	///
+	// STEP 5: process our import table
 	///
 
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -307,7 +338,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	}
 
 	///
-	// STEP 5: process our delayed import table
+	// STEP 6: process our delayed import table
 	///
 
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT];
@@ -333,37 +364,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 			}
 		}
 	}
-	
-	///
-	// STEP 6: process all of our images relocations (assuming we missed the preferred address)
-	///
 
-	baseOffset = baseAddress - ntHeaders->OptionalHeader.ImageBase;
-	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
-
-	if (baseOffset && dataDir->Size) {
-
-		relocation = RVA(PIMAGE_BASE_RELOCATION, baseAddress, dataDir->VirtualAddress);
-
-		while (relocation->VirtualAddress) {
-			relocList = (PIMAGE_RELOC)(relocation + 1);
-
-			while ((PBYTE)relocList != (PBYTE)relocation + relocation->SizeOfBlock) {
-
-				if (relocList->type == IMAGE_REL_BASED_DIR64)
-					* (PULONG_PTR)((PBYTE)baseAddress + relocation->VirtualAddress + relocList->offset) += baseOffset;
-				else if (relocList->type == IMAGE_REL_BASED_HIGHLOW)
-					* (PULONG_PTR)((PBYTE)baseAddress + relocation->VirtualAddress + relocList->offset) += (DWORD)baseOffset;
-				else if (relocList->type == IMAGE_REL_BASED_HIGH)
-					* (PULONG_PTR)((PBYTE)baseAddress + relocation->VirtualAddress + relocList->offset) += HIWORD(baseOffset);
-				else if (relocList->type == IMAGE_REL_BASED_LOW)
-					* (PULONG_PTR)((PBYTE)baseAddress + relocation->VirtualAddress + relocList->offset) += LOWORD(baseOffset);
-
-				relocList++;
-			}
-			relocation = (PIMAGE_BASE_RELOCATION)relocList;
-		}
-	}
 	
 	///
 	// STEP 7: Finalize our sections. Set memory protections.
@@ -418,7 +419,6 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	// STEP 8: execute TLS callbacks
 	///
 
-	baseOffset = (ULONG_PTR)(baseAddress - ntHeaders->OptionalHeader.ImageBase);
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
 
 	if (dataDir->Size)
