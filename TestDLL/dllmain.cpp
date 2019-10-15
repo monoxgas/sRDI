@@ -1,10 +1,6 @@
-// dllmain.cpp : Defines the entry point for the DLL application.
-#include "stdafx.h"
+#include <Windows.h>
 #include <stdio.h>
-#include <stdlib.h>
 
-
-HANDLE hSSThread;
 DWORD threadID;
 
 BOOL APIENTRY DllMain( HMODULE hModule,
@@ -28,17 +24,23 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 //extern "C" to prevent C++ name mangling
 extern "C" __declspec(dllexport) BOOL SayGoodbye(LPVOID lpUserdata, DWORD nUserdataLen)
 {
-	return MessageBoxA(NULL, "I'm Leaving!", "Goodbye", 0);
+	MessageBoxA(NULL, "I'm Leaving!", "Goodbye", 0);
+	return TRUE;
 }
 
 extern "C" __declspec(dllexport) BOOL SayHello(LPVOID lpUserdata, DWORD nUserdataLen)
 {
 	if (nUserdataLen) {
-		LPSTR greeting = (LPSTR)malloc(10 + nUserdataLen);
-		sprintf(greeting, "Hello %s!", lpUserdata);
+		DWORD length = 10 + nUserdataLen;
+		LPSTR greeting = (LPSTR)malloc(length);
+		sprintf_s(greeting, length, "Hello %s!", (LPSTR)lpUserdata);
 		MessageBoxA(NULL, greeting, "Hello", 0);
+		free(greeting);
 	}
-	else
-		return MessageBoxA(NULL, "I'm alive!", "Hello", 0);
+	else {
+		MessageBoxA(NULL, "I'm alive!", "Hello", 0);
+	}
+
+	return TRUE;
 }
 
