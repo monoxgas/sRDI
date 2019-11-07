@@ -20,7 +20,7 @@ This project is comprised of the following elements:
 ## Use Cases / Examples
 Before use, I recommend you become familiar with [Reflective DLL Injection](https://disman.tl/2015/01/30/an-improved-reflective-dll-injection-technique.html) and it's purpose. 
 
-### Convert DLL to shellcode using python
+#### Convert DLL to shellcode using python
 ```python
 from ShellcodeRDI import *
 
@@ -28,18 +28,18 @@ dll = open("TestDLL_x86.dll", 'rb').read()
 shellcode = ConvertToShellcode(dll)
 ```
 
-### Load DLL into memory using C# loader
+#### Load DLL into memory using C# loader
 ```
 DotNetLoader.exe TestDLL_x64.dll
 ```
 
-### Convert DLL with python script and load with Native EXE
+#### Convert DLL with python script and load with Native EXE
 ```
 python ConvertToShellcode.py TestDLL_x64.dll
 NativeLoader.exe TestDLL_x64.bin
 ```
 
-### Convert DLL with powershell and load with Invoke-Shellcode
+#### Convert DLL with powershell and load with Invoke-Shellcode
 ```powershell
 Import-Module .\Invoke-Shellcode.ps1
 Import-Module .\ConvertTo-Shellcode.ps1
