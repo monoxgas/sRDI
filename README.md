@@ -67,6 +67,15 @@ After building the project, the other binaries will be located at:
 - `bin\TestDLL_<arch>.dll`
 - `bin\ShellcodeRDI_<arch>.bin`
 
+
+## Alternatives
+If you find my code disgusting, or just looking for an alternative memory-PE loader project, check out some of these:
+
+- https://github.com/fancycode/MemoryModule - Probably one of the cleanest PE loaders out there, great reference.
+- https://github.com/TheWover/donut - Want to convert .NET assemblies? Or how about JScript?
+- https://github.com/hasherezade/pe_to_shellcode - Generates a polymorphic PE+shellcode hybrids.
+- https://github.com/DarthTon/Blackbone - Large library with many memory hacking/hooking primitives.
+
 ## Credits
 The basis of this project is derived from ["Improved Reflective DLL Injection" from Dan Staples](https://disman.tl/2015/01/30/an-improved-reflective-dll-injection-technique.html) which itself is derived from the original project by [Stephen Fewer](https://github.com/stephenfewer/ReflectiveDLLInjection). 
 
