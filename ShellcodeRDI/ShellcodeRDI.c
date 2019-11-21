@@ -34,6 +34,7 @@
 #define LOCALFREE_HASH					0xea61fcb1			
 #define VIRTUALFREE_HASH				0x300f2f0b
 #define SLEEP_HASH						0xe035f044
+#define RTLADDFUNCTIONTABLE_HASH		0x45b82eba
 
 #define HASH_KEY						13
 
@@ -60,7 +61,7 @@ typedef int (WINAPI * MESSAGEBOXA)(HWND, LPSTR, LPSTR, UINT);
 typedef BOOL(WINAPI * VIRTUALFREE)(LPVOID, SIZE_T, DWORD);
 typedef BOOL(WINAPI * LOCALFREE)(LPVOID);
 typedef VOID(WINAPI* SLEEP)(DWORD);
-
+typedef BOOLEAN(WINAPI* RTLADDFUNCTIONTABLE)(PVOID, DWORD, DWORD64);
 
 #define RVA(type, base, rva) (type)((ULONG_PTR) base + rva)
 
@@ -93,6 +94,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	VIRTUALFREE pVirtualFree = NULL;
 	LOCALFREE pLocalFree = NULL;
 	SLEEP pSleep = NULL;
+	RTLADDFUNCTIONTABLE pRtlAddFunctionTable = NULL;
 	/// MESSAGEBOXA pMessageBoxA = NULL;
 
 	// PE data
@@ -108,6 +110,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	PIMAGE_BASE_RELOCATION relocation;
 	PIMAGE_RELOC relocList;
 	PIMAGE_EXPORT_DIRECTORY exportDir;
+	PIMAGE_RUNTIME_FUNCTION_ENTRY rfEntry;
 	PDWORD expName;
 	PWORD expOrdinal;
 	LPCSTR expNameStr;
@@ -158,10 +161,12 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	pNtFlushInstructionCache = (NTFLUSHINSTRUCTIONCACHE)GetProcAddressWithHash(NTFLUSHINSTRUCTIONCACHE_HASH);
 	pGetNativeSystemInfo = (GETNATIVESYSTEMINFO)GetProcAddressWithHash(GETNATIVESYSTEMINFO_HASH);
 	pSleep = (SLEEP)GetProcAddressWithHash(SLEEP_HASH);
+	pRtlAddFunctionTable = (RTLADDFUNCTIONTABLE)GetProcAddressWithHash(RTLADDFUNCTIONTABLE_HASH);
+
 	/// pMessageBoxA = (MESSAGEBOXA)GetProcAddressWithHash(MESSAGEBOXA_HASH);
 
 	if (!pLoadLibraryA || !pGetProcAddress || !pVirtualAlloc || !pVirtualProtect || 
-		!pNtFlushInstructionCache || !pGetNativeSystemInfo || !pSleep) {
+		!pNtFlushInstructionCache || !pGetNativeSystemInfo || !pSleep || !pRtlAddFunctionTable) {
 		return 0;
 	}
 	
@@ -416,7 +421,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	pNtFlushInstructionCache((HANDLE)-1, NULL, 0);
 
 	///
-	// STEP 8: execute TLS callbacks
+	// STEP 8: Execute TLS callbacks
 	///
 
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
@@ -432,14 +437,28 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	}
 
 	///
-	// STEP 9: call our images entry point
+	// STEP 9: Register exception handlers (x64 only)
+	///
+
+#ifdef _WIN64
+	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION];
+
+	if (dataDir->Size)
+	{
+		rfEntry = RVA(PIMAGE_RUNTIME_FUNCTION_ENTRY, baseAddress, dataDir->VirtualAddress);
+		pRtlAddFunctionTable(rfEntry, (dataDir->Size / sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY)) - 1, baseAddress);
+	}
+#endif
+
+	///
+	// STEP 10: call our images entry point
 	///
 
 	dllMain = RVA(DLLMAIN, baseAddress, ntHeaders->OptionalHeader.AddressOfEntryPoint);
 	dllMain((HINSTANCE)baseAddress, DLL_PROCESS_ATTACH, (LPVOID)1);
 
 	///
-	// STEP 10: call our exported function
+	// STEP 11: call our exported function
 	///
 
 	if (dwFunctionHash) {

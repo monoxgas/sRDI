@@ -14,78 +14,40 @@
 #define DEREF_16( name )*(WORD *)(name)
 #define DEREF_8( name )*(BYTE *)(name)
 
-FARPROC GetProcAddressR(UINT_PTR uiLibraryAddress, LPCSTR lpProcName)
-{
-	FARPROC fpResult = NULL;
+#define RVA(type, base, rva) (type)((ULONG_PTR) base + rva)
 
-	if (uiLibraryAddress == NULL)
+FARPROC GetProcAddressR(HMODULE hModule, LPCSTR lpProcName)
+{
+	if (hModule == NULL || lpProcName == NULL)
 		return NULL;
 
-	UINT_PTR uiAddressArray = 0;
-	UINT_PTR uiNameArray = 0;
-	UINT_PTR uiNameOrdinals = 0;
-	PIMAGE_NT_HEADERS pNtHeaders = NULL;
-	PIMAGE_DATA_DIRECTORY pDataDirectory = NULL;
-	PIMAGE_EXPORT_DIRECTORY pExportDirectory = NULL;
+	PIMAGE_NT_HEADERS ntHeaders = RVA(PIMAGE_NT_HEADERS, hModule, ((PIMAGE_DOS_HEADER)hModule)->e_lfanew);
+	PIMAGE_DATA_DIRECTORY dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+	if (!dataDir->Size)
+		return NULL;
 
-	// get the VA of the modules NT Header
-	pNtHeaders = (PIMAGE_NT_HEADERS)(uiLibraryAddress + ((PIMAGE_DOS_HEADER)uiLibraryAddress)->e_lfanew);
+	PIMAGE_EXPORT_DIRECTORY exportDir = RVA(PIMAGE_EXPORT_DIRECTORY, hModule, dataDir->VirtualAddress);
+	if (!exportDir->NumberOfNames || !exportDir->NumberOfFunctions)
+		return NULL;
 
-	pDataDirectory = (PIMAGE_DATA_DIRECTORY)&pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+	PDWORD expName = RVA(PDWORD, hModule, exportDir->AddressOfNames);
+	PWORD expOrdinal = RVA(PWORD, hModule, exportDir->AddressOfNameOrdinals);
+	LPCSTR expNameStr;
 
-	// get the VA of the export directory
-	pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)(uiLibraryAddress + pDataDirectory->VirtualAddress);
+	for (DWORD i = 0; i < exportDir->NumberOfNames; i++, expName++, expOrdinal++) {
 
-	// get the VA for the array of addresses
-	uiAddressArray = (uiLibraryAddress + pExportDirectory->AddressOfFunctions);
+		expNameStr = RVA(LPCSTR, hModule, *expName);
 
-	// get the VA for the array of name pointers
-	uiNameArray = (uiLibraryAddress + pExportDirectory->AddressOfNames);
+		if (!expNameStr)
+			break;
 
-	// get the VA for the array of name ordinals
-	uiNameOrdinals = (uiLibraryAddress + pExportDirectory->AddressOfNameOrdinals);
-
-	// test if we are importing by name or by ordinal...
-	if (((DWORD)lpProcName & 0xFFFF0000) == 0x00000000)
-	{
-		// import by ordinal...
-
-		// use the import ordinal (- export ordinal base) as an index into the array of addresses
-		uiAddressArray += ((IMAGE_ORDINAL((DWORD)lpProcName) - pExportDirectory->Base) * sizeof(DWORD));
-
-		// resolve the address for this imported function
-		fpResult = (FARPROC)(uiLibraryAddress + DEREF_32(uiAddressArray));
-	}
-	else
-	{
-		// import by name...
-		DWORD dwCounter = pExportDirectory->NumberOfNames;
-		while (dwCounter--)
-		{
-			char* cpExportedFunctionName = (char*)(uiLibraryAddress + DEREF_32(uiNameArray));
-
-			// test if we have a match...
-			if (strcmp(cpExportedFunctionName, lpProcName) == 0)
-			{
-				// use the functions name ordinal as an index into the array of name pointers
-				uiAddressArray += (DEREF_16(uiNameOrdinals) * sizeof(DWORD));
-
-				// calculate the virtual address for the function
-				fpResult = (FARPROC)(uiLibraryAddress + DEREF_32(uiAddressArray));
-
-				// finish...
-				break;
-			}
-
-			// get the next exported function name
-			uiNameArray += sizeof(DWORD);
-
-			// get the next exported function name ordinal
-			uiNameOrdinals += sizeof(WORD);
+		if (!_stricmp(lpProcName, expNameStr)) {
+			DWORD funcRva = *RVA(PDWORD, hModule, exportDir->AddressOfFunctions + (*expOrdinal * 4));
+			return RVA(FARPROC, hModule, funcRva);
 		}
 	}
 
-	return fpResult;
+	return NULL;
 }
 
 
@@ -146,9 +108,9 @@ int main()
 
 	LoadDLL(
 		(ULONG_PTR)buffer,
-		HashFunctionName("SayHello"),
+		HashFunctionName("SayGoodbye"),
 		NULL, 0, 
-		SRDI_CLEARHEADER | SRDI_CLEARMEMORY | SRDI_OBFUSCATEIMPORTS | (3 << 16)
+		SRDI_CLEARHEADER | SRDI_CLEARMEMORY // | SRDI_OBFUSCATEIMPORTS | (3 << 16)
 	);
 
     return 0;
