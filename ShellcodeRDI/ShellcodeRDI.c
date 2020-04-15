@@ -36,6 +36,10 @@
 #define SLEEP_HASH						0xe035f044
 #define RTLADDFUNCTIONTABLE_HASH		0x45b82eba
 
+#define LDRLOADDLL_HASH					0xbdbf9c13
+#define LDRGETPROCADDRESS_HASH			0x5ed941b5
+
+
 #define HASH_KEY						13
 
 #ifdef _WIN64
@@ -54,7 +58,7 @@ typedef HMODULE(WINAPI * LOADLIBRARYA)(LPCSTR);
 typedef ULONG_PTR(WINAPI * GETPROCADDRESS)(HMODULE, LPCSTR);
 typedef LPVOID(WINAPI * VIRTUALALLOC)(LPVOID, SIZE_T, DWORD, DWORD);
 typedef VOID(WINAPI * EXITTHREAD)(DWORD);
-typedef DWORD(NTAPI  * NTFLUSHINSTRUCTIONCACHE)(HANDLE, PVOID, ULONG);
+typedef BOOL(NTAPI  * FLUSHINSTRUCTIONCACHE)(HANDLE, LPCVOID, SIZE_T);
 typedef VOID(WINAPI * GETNATIVESYSTEMINFO)(LPSYSTEM_INFO);
 typedef BOOL(WINAPI * VIRTUALPROTECT)(LPVOID, SIZE_T, DWORD, PDWORD);
 typedef int (WINAPI * MESSAGEBOXA)(HWND, LPSTR, LPSTR, UINT);
@@ -63,7 +67,8 @@ typedef BOOL(WINAPI * LOCALFREE)(LPVOID);
 typedef VOID(WINAPI* SLEEP)(DWORD);
 typedef BOOLEAN(WINAPI* RTLADDFUNCTIONTABLE)(PVOID, DWORD, DWORD64);
 
-#define RVA(type, base, rva) (type)((ULONG_PTR) base + rva)
+typedef NTSTATUS(WINAPI *LDRLOADDLL)(PWCHAR, ULONG, PUNICODE_STRING, PHANDLE);
+typedef NTSTATUS(WINAPI *LDRGETPROCADDRESS)(HMODULE, PANSI_STRING, WORD, PVOID*);
 
 #pragma warning( push )
 #pragma warning( disable : 4214 ) // nonstandard extension
@@ -71,13 +76,43 @@ typedef struct
 {
 	WORD	offset : 12;
 	WORD	type : 4;
-} IMAGE_RELOC, *PIMAGE_RELOC;
+} IMAGE_RELOC, * PIMAGE_RELOC;
 #pragma warning(pop)
 
 static inline size_t
 AlignValueUp(size_t value, size_t alignment) {
 	return (value + alignment - 1) & ~(alignment - 1);
 }
+static inline size_t
+_strlen(char* s) {
+	size_t i;
+	for (i = 0; s[i] != '\0'; i++);
+	return i;
+}
+
+static inline size_t
+_wcslen(wchar_t* s) {
+	size_t i;
+	for (i = 0; s[i] != '\0'; i++);
+	return i;
+}
+
+#define RVA(type, base, rva) (type)((ULONG_PTR) base + rva)
+
+#define FILL_STRING(string, buffer) \
+	string.Length = (USHORT)_strlen(buffer); \
+	string.MaximumLength = string.Length; \
+	string.Buffer = buffer
+
+#define FILL_UNI_STRING(string, buffer) \
+	string.Length = (USHORT)_wcslen(buffer); \
+	string.MaximumLength = string.Length; \
+	string.Buffer = buffer
+
+#define FILL_STRING_WITH_BUF(string, buffer) \
+	string.Length = sizeof(buffer); \
+	string.MaximumLength = string.Length; \
+	string.Buffer = (PCHAR)buffer
 
 ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen, DWORD flags)
 {
@@ -85,17 +120,22 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	#pragma warning( disable : 4055 ) // Ignore cast warnings
 
 	// Function pointers
+
+	LDRLOADDLL pLdrLoadDll = NULL;
+	LDRGETPROCADDRESS pLdrGetProcAddress = NULL;
+
 	LOADLIBRARYA pLoadLibraryA = NULL;
-	GETPROCADDRESS pGetProcAddress = NULL;
 	VIRTUALALLOC pVirtualAlloc = NULL;
-	NTFLUSHINSTRUCTIONCACHE pNtFlushInstructionCache = NULL;
+	FLUSHINSTRUCTIONCACHE pFlushInstructionCache = NULL;
 	GETNATIVESYSTEMINFO pGetNativeSystemInfo = NULL;
 	VIRTUALPROTECT pVirtualProtect = NULL;
 	VIRTUALFREE pVirtualFree = NULL;
 	LOCALFREE pLocalFree = NULL;
 	SLEEP pSleep = NULL;
 	RTLADDFUNCTIONTABLE pRtlAddFunctionTable = NULL;
-	/// MESSAGEBOXA pMessageBoxA = NULL;
+
+	//CHAR msg[2] = { 'a','\0' };
+	//MESSAGEBOXA pMessageBoxA = NULL;
 
 	// PE data
 	PIMAGE_NT_HEADERS ntHeaders;
@@ -134,9 +174,26 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	SYSTEM_INFO sysInfo;
 
 	// General
-	PBYTE libraryAddress;
 	DWORD funcHash;
 	DWORD importCount;
+	HANDLE library;
+
+	// String
+	UNICODE_STRING uString = { 0 };
+	STRING aString = { 0 };
+	
+	WCHAR sKernel32[] = { 'k', 'e', 'r', 'n', 'e', 'l', '3', '2', '.', 'd', 'l', 'l'};
+
+	// At a certain length (15ish), the compiler with screw with inline
+	// strings declared as CHAR. No idea why, use BYTE to get around it.
+
+	BYTE sSleep[] = { 'S', 'l', 'e', 'e', 'p' };
+	BYTE sLoadLibrary[] = { 'L', 'o', 'a', 'd', 'L', 'i', 'b', 'r', 'a', 'r', 'y', 'A' };
+	BYTE sVirtualAlloc[] = { 'V', 'i', 'r', 't', 'u', 'a', 'l', 'A', 'l', 'l', 'o', 'c' };
+	BYTE sVirtualProtect[] = { 'V', 'i', 'r', 't', 'u', 'a', 'l', 'P', 'r', 'o', 't', 'e', 'c', 't' };
+	BYTE sFlushInstructionCache[] = { 'F', 'l', 'u', 's', 'h', 'I', 'n', 's', 't', 'r', 'u', 'c', 't', 'i', 'o', 'n', 'C', 'a', 'c', 'h', 'e' };
+	BYTE sGetNativeSystemInfo[] = { 'G', 'e', 't', 'N', 'a', 't', 'i', 'v', 'e', 'S', 'y', 's', 't', 'e', 'm', 'I', 'n', 'f', 'o' };
+	BYTE sRtlAddFunctionTable[] = { 'R', 't', 'l', 'A', 'd', 'd', 'F', 'u', 'n', 'c', 't', 'i', 'o', 'n', 'T', 'a', 'b', 'l', 'e' };
 
 	// Import obfuscation
 	DWORD randSeed;
@@ -154,19 +211,43 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	// STEP 1: locate all the required functions
 	///
 
-	pLoadLibraryA = (LOADLIBRARYA)GetProcAddressWithHash(LOADLIBRARYA_HASH);
-	pGetProcAddress = (GETPROCADDRESS)GetProcAddressWithHash(GETPROCADDRESS_HASH);
-	pVirtualAlloc = (VIRTUALALLOC)GetProcAddressWithHash(VIRTUALALLOC_HASH);
-	pVirtualProtect = (VIRTUALPROTECT)GetProcAddressWithHash(VIRTUALPROTECT_HASH);
-	pNtFlushInstructionCache = (NTFLUSHINSTRUCTIONCACHE)GetProcAddressWithHash(NTFLUSHINSTRUCTIONCACHE_HASH);
-	pGetNativeSystemInfo = (GETNATIVESYSTEMINFO)GetProcAddressWithHash(GETNATIVESYSTEMINFO_HASH);
-	pSleep = (SLEEP)GetProcAddressWithHash(SLEEP_HASH);
-	pRtlAddFunctionTable = (RTLADDFUNCTIONTABLE)GetProcAddressWithHash(RTLADDFUNCTIONTABLE_HASH);
+	pLdrLoadDll = (LDRLOADDLL)GetProcAddressWithHash(LDRLOADDLL_HASH);
+	pLdrGetProcAddress = (LDRGETPROCADDRESS)GetProcAddressWithHash(LDRGETPROCADDRESS_HASH);
 
-	/// pMessageBoxA = (MESSAGEBOXA)GetProcAddressWithHash(MESSAGEBOXA_HASH);
+	uString.Buffer = sKernel32;
+	uString.MaximumLength = sizeof(sKernel32);
+	uString.Length = sizeof(sKernel32);
 
-	if (!pLoadLibraryA || !pGetProcAddress || !pVirtualAlloc || !pVirtualProtect || 
-		!pNtFlushInstructionCache || !pGetNativeSystemInfo || !pSleep || !pRtlAddFunctionTable) {
+	//pMessageBoxA = (MESSAGEBOXA)GetProcAddressWithHash(MESSAGEBOXA_HASH);
+
+	pLdrLoadDll(NULL, 0, &uString, &library);
+
+	FILL_STRING_WITH_BUF(aString, sVirtualAlloc);
+	pLdrGetProcAddress(library, &aString, 0, (PVOID*)&pVirtualAlloc);
+
+	FILL_STRING_WITH_BUF(aString, sVirtualProtect);
+	pLdrGetProcAddress(library, &aString, 0, (PVOID*)&pVirtualProtect);
+
+	FILL_STRING_WITH_BUF(aString, sFlushInstructionCache);
+	pLdrGetProcAddress(library, &aString, 0, (PVOID*)&pFlushInstructionCache);
+
+	FILL_STRING_WITH_BUF(aString, sGetNativeSystemInfo);
+	pLdrGetProcAddress(library, &aString, 0, (PVOID*)&pGetNativeSystemInfo);
+
+	FILL_STRING_WITH_BUF(aString, sSleep);
+	pLdrGetProcAddress(library, &aString, 0, (PVOID*)&pSleep);
+
+	FILL_STRING_WITH_BUF(aString, sRtlAddFunctionTable);
+	pLdrGetProcAddress(library, &aString, 0, (PVOID*)&pRtlAddFunctionTable);
+
+	FILL_STRING_WITH_BUF(aString, sLoadLibrary);
+	pLdrGetProcAddress(library, &aString, 0, (PVOID*)&pLoadLibraryA);
+
+	//FILL_STRING_WITH_BUF(aString, sMessageBox);
+	//pLdrGetProcAddress(library, &aString, 0, (PVOID*)&pMessageBoxA);
+
+	if (!pVirtualAlloc || !pVirtualProtect || !pSleep ||
+		!pFlushInstructionCache || !pGetNativeSystemInfo) {
 		return 0;
 	}
 	
@@ -292,7 +373,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	///
 
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-	randSeed = (DWORD)dllData;
+	randSeed = (DWORD)((ULONGLONG)dllData);
 
 	if (dataDir->Size) {
 
@@ -320,19 +401,21 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 
 		importDesc = RVA(PIMAGE_IMPORT_DESCRIPTOR, baseAddress, dataDir->VirtualAddress);
 		for (; importDesc->Name; importDesc++) {
-			libraryAddress = (PBYTE)pLoadLibraryA((LPCSTR)(baseAddress + importDesc->Name));
+
+			library = pLoadLibraryA((LPSTR)(baseAddress + importDesc->Name));
+
 			firstThunk = RVA(PIMAGE_THUNK_DATA, baseAddress, importDesc->FirstThunk);
 			origFirstThunk = RVA(PIMAGE_THUNK_DATA, baseAddress, importDesc->OriginalFirstThunk);
 
-			// iterate through all imported functions, importing by ordinal if no name present
 			for (; origFirstThunk->u1.Function; firstThunk++, origFirstThunk++) {
 
 				if (IMAGE_SNAP_BY_ORDINAL(origFirstThunk->u1.Ordinal)) {
-					firstThunk->u1.Function = (ULONG_PTR)pGetProcAddress((HMODULE)libraryAddress, (LPCSTR)IMAGE_ORDINAL(origFirstThunk->u1.Ordinal));
+					pLdrGetProcAddress(library, NULL, (WORD)origFirstThunk->u1.Ordinal, (PVOID *)&(firstThunk->u1.Function));
 				}
 				else {
 					importByName = RVA(PIMAGE_IMPORT_BY_NAME, baseAddress, origFirstThunk->u1.AddressOfData);
-					firstThunk->u1.Function = (ULONG_PTR)pGetProcAddress((HMODULE)libraryAddress, importByName->Name);
+					FILL_STRING(aString, importByName->Name);
+					pLdrGetProcAddress(library, &aString, 0, (PVOID*)&(firstThunk->u1.Function));
 				}
 			}
 
@@ -353,18 +436,19 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 
 		for (; delayDesc->DllNameRVA; delayDesc++) {
 
-			libraryAddress = (PBYTE)pLoadLibraryA((LPCSTR)(baseAddress + delayDesc->DllNameRVA));
+			library = pLoadLibraryA((LPSTR)(baseAddress + delayDesc->DllNameRVA));
+
 			firstThunk = RVA(PIMAGE_THUNK_DATA, baseAddress, delayDesc->ImportAddressTableRVA);
 			origFirstThunk = RVA(PIMAGE_THUNK_DATA, baseAddress, delayDesc->ImportNameTableRVA);
 
-			// iterate through all imported functions, importing by ordinal if no name present
 			for (; firstThunk->u1.Function; firstThunk++, origFirstThunk++) {
 				if (IMAGE_SNAP_BY_ORDINAL(origFirstThunk->u1.Ordinal)) {
-					firstThunk->u1.Function = (ULONG_PTR)pGetProcAddress((HMODULE)libraryAddress, (LPCSTR)IMAGE_ORDINAL(origFirstThunk->u1.Ordinal));
+					pLdrGetProcAddress(library, NULL, (WORD)origFirstThunk->u1.Ordinal, (PVOID *)&(firstThunk->u1.Function));
 				}
 				else {
 					importByName = RVA(PIMAGE_IMPORT_BY_NAME, baseAddress, origFirstThunk->u1.AddressOfData);
-					firstThunk->u1.Function = (ULONG_PTR)pGetProcAddress((HMODULE)libraryAddress, importByName->Name);
+					FILL_STRING(aString, importByName->Name);
+					pLdrGetProcAddress(library, &aString, 0, (PVOID *)&(firstThunk->u1.Function));
 				}
 			}
 		}
@@ -418,7 +502,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	}
 
 	// We must flush the instruction cache to avoid stale code being used
-	pNtFlushInstructionCache((HANDLE)-1, NULL, 0);
+	pFlushInstructionCache((HANDLE)-1, NULL, 0);
 
 	///
 	// STEP 8: Execute TLS callbacks
@@ -443,7 +527,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 #ifdef _WIN64
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION];
 
-	if (dataDir->Size)
+	if (pRtlAddFunctionTable && dataDir->Size)
 	{
 		rfEntry = RVA(PIMAGE_RUNTIME_FUNCTION_ENTRY, baseAddress, dataDir->VirtualAddress);
 		pRtlAddFunctionTable(rfEntry, (dataDir->Size / sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY)) - 1, baseAddress);
