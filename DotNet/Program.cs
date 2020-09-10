@@ -346,74 +346,6 @@ namespace RDIShellcodeLoader
             public IMAGE_FILE_HEADER FileHeader;
             public IMAGE_OPTIONAL_HEADER OptionalHeader;
         }
-
-        public static unsafe class InteropTools
-        {
-            private static readonly Type SafeBufferType = typeof(SafeBuffer);
-            public delegate void PtrToStructureNativeDelegate(byte* ptr, TypedReference structure, uint sizeofT);
-            public delegate void StructureToPtrNativeDelegate(TypedReference structure, byte* ptr, uint sizeofT);
-            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
-            private static readonly MethodInfo PtrToStructureNativeMethod = SafeBufferType.GetMethod("PtrToStructureNative", flags);
-            private static readonly MethodInfo StructureToPtrNativeMethod = SafeBufferType.GetMethod("StructureToPtrNative", flags);
-            public static readonly PtrToStructureNativeDelegate PtrToStructureNative = (PtrToStructureNativeDelegate)Delegate.CreateDelegate(typeof(PtrToStructureNativeDelegate), PtrToStructureNativeMethod);
-            public static readonly StructureToPtrNativeDelegate StructureToPtrNative = (StructureToPtrNativeDelegate)Delegate.CreateDelegate(typeof(StructureToPtrNativeDelegate), StructureToPtrNativeMethod);
-
-            private static readonly Func<Type, bool, int> SizeOfHelper_f = (Func<Type, bool, int>)Delegate.CreateDelegate(typeof(Func<Type, bool, int>), typeof(Marshal).GetMethod("SizeOfHelper", flags));
-
-            public static void StructureToPtrDirect(TypedReference structure, IntPtr ptr, int size)
-            {
-                StructureToPtrNative(structure, (byte*)ptr, unchecked((uint)size));
-            }
-
-            public static void StructureToPtrDirect(TypedReference structure, IntPtr ptr)
-            {
-                StructureToPtrDirect(structure, ptr, SizeOf(__reftype(structure)));
-            }
-
-            public static void PtrToStructureDirect(IntPtr ptr, TypedReference structure, int size)
-            {
-                PtrToStructureNative((byte*)ptr, structure, unchecked((uint)size));
-            }
-
-            public static void PtrToStructureDirect(IntPtr ptr, TypedReference structure)
-            {
-                PtrToStructureDirect(ptr, structure, SizeOf(__reftype(structure)));
-            }
-
-            public static void StructureToPtr<T>(ref T structure, IntPtr ptr)
-            {
-                StructureToPtrDirect(__makeref(structure), ptr);
-            }
-
-            public static void PtrToStructure<T>(IntPtr ptr, out T structure)
-            {
-                structure = default(T);
-                PtrToStructureDirect(ptr, __makeref(structure));
-            }
-
-            public static T PtrToStructure<T>(IntPtr ptr)
-            {
-                T obj;
-                PtrToStructure(ptr, out obj);
-                return obj;
-            }
-
-            public static int SizeOf<T>(T structure)
-            {
-                return SizeOf<T>();
-            }
-
-            public static int SizeOf<T>()
-            {
-                return SizeOf(typeof(T));
-            }
-
-            public static int SizeOf(Type t)
-            {
-                return SizeOfHelper_f(t, true);
-            }
-        }
-
         public static IntPtr Rva2Offset(uint dwRva, IntPtr PEPointer)
         {
             bool is64Bit = false;
@@ -423,7 +355,7 @@ namespace RDIShellcodeLoader
             IMAGE_SECTION_HEADER SectionHeader;
             int sizeOfSectionHeader = Marshal.SizeOf(typeof(IMAGE_SECTION_HEADER));
 
-            IMAGE_DOS_HEADER dosHeader = InteropTools.PtrToStructure<IMAGE_DOS_HEADER>(PEPointer);
+            IMAGE_DOS_HEADER dosHeader = (IMAGE_DOS_HEADER)Marshal.PtrToStructure(PEPointer, typeof(IMAGE_DOS_HEADER));
 
             IntPtr NtHeadersPtr = (IntPtr)((UInt64)PEPointer + (UInt64)dosHeader.e_lfanew);
 
