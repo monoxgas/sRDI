@@ -446,8 +446,7 @@ namespace RDIShellcodeLoader
 
             for (int i = 0; i < ExportTable.NumberOfNames; i++)
             {
-                IntPtr NameOffsetPtr = (IntPtr)((ulong)PEPointer + (ulong)ExportTable.AddressOfNames);
-                NameOffsetPtr += (i * Marshal.SizeOf(typeof(UInt32)));
+                IntPtr NameOffsetPtr = (IntPtr)((ulong)PEPointer + (ulong)ExportTable.AddressOfNames + (ulong)(i * Marshal.SizeOf(typeof(UInt32))));
                 IntPtr NamePtr = (IntPtr)((ulong)PEPointer + (uint)Marshal.PtrToStructure(NameOffsetPtr, typeof(uint)));
 
                 string Name = Marshal.PtrToStringAnsi(NamePtr);
