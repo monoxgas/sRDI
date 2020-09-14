@@ -55,7 +55,7 @@ The PE loader code uses `flags` argument to control the various options of loadi
 
 
 ## Building
-This project is built using Visual Studio 2015 (v140) and Windows SDK 8.1. The python script is written using Python 3.
+This project is built using Visual Studio 2019 (v142) and Windows SDK 10. The python script is written using Python 3.
 
 The Python and Powershell scripts are located at:
 - `Python\ConvertToShellcode.py`

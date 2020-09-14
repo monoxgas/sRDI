@@ -24,7 +24,16 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 //extern "C" to prevent C++ name mangling
 extern "C" __declspec(dllexport) BOOL SayGoodbye(LPVOID lpUserdata, DWORD nUserdataLen)
 {
+	try {
+		int i = 0, j = 1;
+		j /= i;   // This will throw a SE (divide by zero).
+	}
+	catch (...) {
+		MessageBoxA(NULL, "C++ Exception Thrown!", "Caught it", 0);
+	}
+
 	MessageBoxA(NULL, "I'm Leaving!", "Goodbye", 0);
+	
 	return TRUE;
 }
 
