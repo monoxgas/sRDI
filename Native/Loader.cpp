@@ -345,7 +345,7 @@ int main(int argc, char *argv[], char *envp[])
 		printf("\n[!] Usage:\n\n\tNativeLoader.exe <DLL File>\n\tNativeLoader.exe <Shellcode Bin>\n");
 		return 0;
 	}
-	if (!GetFileContents("C:\\Users\\Nick\\Documents\\Projects\\Throwback\\Throwback2.5\\bin\\Persistence_InstallUtil_x64.dll", &data, dataSize)) {
+	if (!GetFileContents(argv[1], &data, dataSize)) {
 		printf("\n[!] Failed to load file\n");
 		return 0;
 	}
