@@ -11,6 +11,7 @@
 #define SRDI_CLEARHEADER 0x1
 #define SRDI_CLEARMEMORY 0x2
 #define SRDI_OBFUSCATEIMPORTS 0x4
+#define SRDI_PASS_SHELLCODE_BASE 0x8
 
 #define DEREF( name )*(UINT_PTR *)(name)
 #define DEREF_64( name )*(DWORD64 *)(name)
@@ -114,7 +115,7 @@ _wcslen(wchar_t* s) {
 	string.MaximumLength = string.Length; \
 	string.Buffer = (PCHAR)buffer
 
-ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen, DWORD flags)
+ULONG_PTR LoadDLL(PBYTE pbModule, DWORD dwFunctionHash, LPVOID lpUserData, DWORD dwUserdataLen, PVOID pvShellcodeBase, DWORD dwFlags)
 {
 	#pragma warning( push )
 	#pragma warning( disable : 4055 ) // Ignore cast warnings
@@ -150,7 +151,9 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	PIMAGE_BASE_RELOCATION relocation;
 	PIMAGE_RELOC relocList;
 	PIMAGE_EXPORT_DIRECTORY exportDir;
+#ifdef _WIN64
 	PIMAGE_RUNTIME_FUNCTION_ENTRY rfEntry;
+#endif
 	PDWORD expName;
 	PWORD expOrdinal;
 	LPCSTR expNameStr;
@@ -255,7 +258,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	// STEP 2: load our image into a new permanent location in memory
 	///
 
-	ntHeaders = RVA(PIMAGE_NT_HEADERS, dllData, ((PIMAGE_DOS_HEADER)dllData)->e_lfanew);
+	ntHeaders = RVA(PIMAGE_NT_HEADERS, pbModule, ((PIMAGE_DOS_HEADER)pbModule)->e_lfanew);
 
 	// Perform sanity checks on the image (Stolen from https://github.com/fancycode/MemoryModule/blob/master/MemoryModule.c)
 
@@ -310,16 +313,16 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 
 	// Copy over the headers
 
-	if (flags & SRDI_CLEARHEADER) {
-		((PIMAGE_DOS_HEADER)baseAddress)->e_lfanew = ((PIMAGE_DOS_HEADER)dllData)->e_lfanew;
+	if (dwFlags & SRDI_CLEARHEADER) {
+		((PIMAGE_DOS_HEADER)baseAddress)->e_lfanew = ((PIMAGE_DOS_HEADER)pbModule)->e_lfanew;
 
-		for (i = ((PIMAGE_DOS_HEADER)dllData)->e_lfanew; i < ntHeaders->OptionalHeader.SizeOfHeaders; i++) {
-			((PBYTE)baseAddress)[i] = ((PBYTE)dllData)[i];
+		for (i = ((PIMAGE_DOS_HEADER)pbModule)->e_lfanew; i < ntHeaders->OptionalHeader.SizeOfHeaders; i++) {
+			((PBYTE)baseAddress)[i] = ((PBYTE)pbModule)[i];
 		}
 
 	}else{
 		for (i = 0; i < ntHeaders->OptionalHeader.SizeOfHeaders; i++) {
-			((PBYTE)baseAddress)[i] = ((PBYTE)dllData)[i];
+			((PBYTE)baseAddress)[i] = ((PBYTE)pbModule)[i];
 		}
 	}
 
@@ -333,7 +336,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 
 	for (i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++, sectionHeader++) {
 		for (c = 0; c < sectionHeader->SizeOfRawData; c++) {
-			((PBYTE)(baseAddress + sectionHeader->VirtualAddress))[c] = ((PBYTE)(dllData + sectionHeader->PointerToRawData))[c];
+			((PBYTE)(baseAddress + sectionHeader->VirtualAddress))[c] = ((PBYTE)(pbModule + sectionHeader->PointerToRawData))[c];
 		}
 	}
 
@@ -373,7 +376,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 	///
 
 	dataDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-	randSeed = (DWORD)((ULONGLONG)dllData);
+	randSeed = (DWORD)((ULONGLONG)pbModule);
 
 	if (dataDir->Size) {
 
@@ -384,8 +387,8 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 		}
 
 		importDesc = RVA(PIMAGE_IMPORT_DESCRIPTOR, baseAddress, dataDir->VirtualAddress);
-		if (flags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
-			sleep = (flags & 0xFFFF0000);
+		if (dwFlags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
+			sleep = (dwFlags & 0xFFFF0000);
 			sleep = sleep >> 16;
 
 			for (i = 0; i < importCount - 1; i++) {
@@ -419,7 +422,7 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 				}
 			}
 
-			if (flags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
+			if (sleep & dwFlags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
 				pSleep(sleep * 1000);
 			}
 		}
@@ -577,16 +580,22 @@ ULONG_PTR LoadDLL(PBYTE dllData, DWORD dwFunctionHash, LPVOID lpUserData, DWORD 
 				if (dwFunctionHash == funcHash && expOrdinal)
 				{
 					exportFunc = RVA(EXPORTFUNC, baseAddress, *(PDWORD)(baseAddress + exportDir->AddressOfFunctions + (*expOrdinal * 4)));
-					exportFunc(lpUserData, nUserdataLen);
+
+					if (dwFlags & SRDI_PASS_SHELLCODE_BASE) {
+						exportFunc(pvShellcodeBase, sizeof(PVOID));
+					} else {
+                        exportFunc(lpUserData, dwUserdataLen);                
+					}
+					
 					break;
 				}
 			}
 		} while (0);
 	}
 
-	if (flags & SRDI_CLEARMEMORY && pVirtualFree && pLocalFree) {
-		if (!pVirtualFree((LPVOID)dllData, 0, 0x8000))
-			pLocalFree((LPVOID)dllData);
+	if (dwFlags & SRDI_CLEARMEMORY && pVirtualFree && pLocalFree) {
+		if (!pVirtualFree((LPVOID)pbModule, 0, 0x8000))
+			pLocalFree((LPVOID)pbModule);
 	}
 	 
 	// Atempt to return a handle to the module

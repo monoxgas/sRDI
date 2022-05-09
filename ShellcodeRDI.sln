@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26430.16
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31410.357
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestDLL", "TestDLL\TestDLL.vcxproj", "{558D08E4-48B4-4E5F-94E5-5783CF0557C4}"
 EndProject
@@ -10,6 +10,10 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShellcodeRDI", "ShellcodeRDI\ShellcodeRDI.vcxproj", "{6FC09BDB-365F-4691-BBD9-CB7F69C9527A}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Native", "Native\Native.vcxproj", "{68293519-3053-4AB6-921F-9690E2E1487F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6FC09BDB-365F-4691-BBD9-CB7F69C9527A} = {6FC09BDB-365F-4691-BBD9-CB7F69C9527A}
+		{558D08E4-48B4-4E5F-94E5-5783CF0557C4} = {558D08E4-48B4-4E5F-94E5-5783CF0557C4}
+	EndProjectSection
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "Python", "Python\Python.pyproj", "{BE642266-F34D-43C3-B6E4-EEBF8E489519}"
 EndProject
@@ -77,5 +81,8 @@ Global
 		{FD50DEE9-91AB-4449-BA55-27C71098076B} = {F602BD8E-D2C2-4B04-85C6-292388CF1D83}
 		{68293519-3053-4AB6-921F-9690E2E1487F} = {F602BD8E-D2C2-4B04-85C6-292388CF1D83}
 		{BE642266-F34D-43C3-B6E4-EEBF8E489519} = {F602BD8E-D2C2-4B04-85C6-292388CF1D83}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3C9908F0-8E60-451C-B039-CE1FD3FFB06A}
 	EndGlobalSection
 EndGlobal

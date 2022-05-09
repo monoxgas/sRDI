@@ -52,7 +52,7 @@ The PE loader code uses `flags` argument to control the various options of loadi
 - `SRDI_CLEARHEADER` [0x1]: The DOS Header and DOS Stub for the target DLL are completley wiped with null bytes on load (Except for e_lfanew). This might cause issues with stock windows APIs when supplying the base address as a psuedo `HMODULE`.
 - `SRDI_CLEARMEMORY` [0x2]: After calling functions in the loaded module (`DllMain` and any exports), the DLL data will be cleared from memory. This is dangerous if you expect to continue executing code out of the module (Threads / `GetProcAddressR`).
 - `SRDI_OBFUSCATEIMPORTS` [0x4]: The order of imports in the module will be randomized before starting IAT patching. Additionally, the high 16 bits of the flag can be used to store the number of seconds to pause before processing the next import. For example, `flags | (3 << 16)` will pause 3 seconds between every import.
-
+- `SRDI_PASS_SHELLCODE_BASE` [0x8]: As opposed to passing supplied user data to the exported function, sRDI will instead pass the base address of the currently executing shellcode block. This can be useful for self-cleanup inside more advanced modules.
 
 ## Building
 This project is built using Visual Studio 2019 (v142) and Windows SDK 10. The python script is written using Python 3.
@@ -67,6 +67,27 @@ After building the project, the other binaries will be located at:
 - `bin\TestDLL_<arch>.dll`
 - `bin\ShellcodeRDI_<arch>.bin`
 
+If you would like to update the static blobs inside any of the tools:
+```
+> python .\lib\Python\EncodeBlobs.py -h
+usage: EncodeBlobs.py [-h] solution_dir
+
+sRDI Blob Encoder
+
+positional arguments:
+  solution_dir  Solution Directory
+
+optional arguments:
+  -h, --help    show this help message and exit
+
+> python lib\Python\EncodeBlobs.py C:\code\srdi
+
+[+] Updated C:\code\srdi\Native/Loader.cpp
+[+] Updated C:\code\srdi\DotNet/Program.cs
+[+] Updated C:\code\srdi\Python/ShellcodeRDI.py
+[+] Updated C:\code\srdi\PowerShell/ConvertTo-Shellcode.ps1
+
+```
 
 ## Alternatives
 If you find my code disgusting, or just looking for an alternative memory-PE loader project, check out some of these:
