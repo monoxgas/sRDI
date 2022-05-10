@@ -422,7 +422,7 @@ ULONG_PTR LoadDLL(PBYTE pbModule, DWORD dwFunctionHash, LPVOID lpUserData, DWORD
 				}
 			}
 
-			if (sleep & dwFlags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
+			if (sleep && dwFlags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
 				pSleep(sleep * 1000);
 			}
 		}
