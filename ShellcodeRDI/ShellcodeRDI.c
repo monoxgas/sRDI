@@ -386,6 +386,7 @@ ULONG_PTR LoadDLL(PBYTE pbModule, DWORD dwFunctionHash, LPVOID lpUserData, DWORD
 			importCount++;
 		}
 
+		sleep = 0;
 		importDesc = RVA(PIMAGE_IMPORT_DESCRIPTOR, baseAddress, dataDir->VirtualAddress);
 		if (dwFlags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
 			sleep = (dwFlags & 0xFFFF0000);

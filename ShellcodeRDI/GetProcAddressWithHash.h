@@ -94,14 +94,18 @@ HMODULE GetProcAddressWithHash( DWORD dwModuleFunctionHash )
 
 		pExportDir = (PIMAGE_EXPORT_DIRECTORY) ((ULONG_PTR) pModuleBase + dwExportDirRVA);
 
-		dwNumFunctions = pExportDir->NumberOfNames;
-		pdwFunctionNameBase = (PDWORD) ((PCHAR) pModuleBase + pExportDir->AddressOfNames);
+		// We'll assume the function we are matching isn't the very first or last for safety
+		
+		dwNumFunctions = pExportDir->NumberOfNames - 1;
+		pdwFunctionNameBase = (PDWORD) ((PCHAR) pModuleBase + pExportDir->AddressOfNames + (dwNumFunctions * sizeof(DWORD)));
 
-		for (i = 0; i < dwNumFunctions; i++)
+		// We'll also iterate in reverse to switch things up
+
+		for (i = dwNumFunctions; i > 1; i--)
 		{
 			dwFunctionHash = 0;
 			pFunctionName = (PCSTR) (*pdwFunctionNameBase + (ULONG_PTR) pModuleBase);
-			pdwFunctionNameBase++;
+			pdwFunctionNameBase--;
 
 			pTempChar = pFunctionName;
 
