@@ -63,7 +63,7 @@ public class sRDI
 
         uint dllOffset = 0;
 
-        if (PE.Is64BitDLL(dllBytes))
+        if (Is64BitDLL(dllBytes))
         {
             var rdiShellcode = rdiShellcode64;
             int bootstrapSize = 69;
