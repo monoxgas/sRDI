@@ -84,7 +84,7 @@ DWORD HashFunctionName(LPSTR name) {
 	return hash;
 }
 
-extern "C" ULONG_PTR LoadDLL(ULONG_PTR uiLibraryAddress, DWORD dwFunctionHash, LPVOID lpUserData, DWORD nUserdataLen, DWORD flags);
+extern "C" ULONG_PTR LoadDLL(PBYTE pbModule, DWORD dwFunctionHash, LPVOID lpUserData, DWORD dwUserdataLen, PVOID pvShellcodeBase, DWORD dwFlags);
 
 int main()
 {
@@ -107,9 +107,10 @@ int main()
 	}
 
 	LoadDLL(
-		(ULONG_PTR)buffer,
+		(PBYTE)buffer,
 		HashFunctionName("SayGoodbye"),
 		NULL, 0, 
+		nullptr,
 		SRDI_CLEARHEADER | SRDI_CLEARMEMORY // | SRDI_OBFUSCATEIMPORTS | (3 << 16)
 	);
 
