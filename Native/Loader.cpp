@@ -186,7 +186,7 @@ BOOL ConvertToShellcode(LPVOID inBytes, DWORD length, DWORD userFunction, LPVOID
 		bootstrap[i++] = 0x89;
 		bootstrap[i++] = 0x4C;
 		bootstrap[i++] = 0x24;
-		bootstrap[i++] = 5 * 8;
+		bootstrap[i++] = 4 * 8;
 
 		// add rcx, <Offset of the DLL>
 		bootstrap[i++] = 0x48;
@@ -199,7 +199,7 @@ BOOL ConvertToShellcode(LPVOID inBytes, DWORD length, DWORD userFunction, LPVOID
 		bootstrap[i++] = 0xC7;
 		bootstrap[i++] = 0x44;
 		bootstrap[i++] = 0x24;
-		bootstrap[i++] = 4 * 8;
+		bootstrap[i++] = 5 * 8;
 		MoveMemory(bootstrap + i, &flags, sizeof(flags));
 		i += sizeof(flags);
 
