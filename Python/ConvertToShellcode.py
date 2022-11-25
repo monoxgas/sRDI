@@ -34,7 +34,7 @@ def main():
     if arguments.pass_shellcode_base:
         flags |= 0x8
 
-    if hasattr(arguments, 'function_ordinal'):
+    if arguments.function_ordinal:
         function = arguments.function_ordinal
         flags |= 0x16
     else:
