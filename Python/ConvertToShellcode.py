@@ -14,6 +14,7 @@ def main():
     parser.add_argument('-i', '--obfuscate-imports', dest='obfuscate_imports', action='store_true', help='Randomize import dependency load order', default=False)
     parser.add_argument('-d', '--import-delay', dest='import_delay', help='Number of seconds to pause between loading imports', type=int, default=0)
     parser.add_argument('-of', '--output-format', dest='output_format', help='Output format of the shellcode (e.g. raw,string)', type=str, default="raw")
+    parser.add_argument('-o', '--function-ordinal', dest='function_ordinal', type=int, help='The ordinal of the function to call after DllMain')
 
     arguments = parser.parse_args()
 
@@ -33,7 +34,12 @@ def main():
     if arguments.pass_shellcode_base:
         flags |= 0x8
 
-    converted_dll = ConvertToShellcode(dll, HashFunctionName(arguments.function_name), arguments.user_data.encode(), flags)
+    if arguments.function_ordinal:
+        function = arguments.function_ordinal
+        flags |= 0x16
+    else:
+        function = HashFunctionName(arguments.function_name)
+    converted_dll = ConvertToShellcode(dll, function, arguments.user_data.encode(), flags)
 
     if arguments.output_format=="raw":
         print('Creating Shellcode: {}'.format(output_bin))

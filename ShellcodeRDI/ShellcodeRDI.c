@@ -12,6 +12,7 @@
 #define SRDI_CLEARMEMORY 0x2
 #define SRDI_OBFUSCATEIMPORTS 0x4
 #define SRDI_PASS_SHELLCODE_BASE 0x8
+#define SRDI_ORDINAL 0x16
 
 #define DEREF( name )*(UINT_PTR *)(name)
 #define DEREF_64( name )*(DWORD64 *)(name)
@@ -156,6 +157,7 @@ ULONG_PTR LoadDLL(PBYTE pbModule, DWORD dwFunctionHash, LPVOID lpUserData, DWORD
 #endif
 	PDWORD expName;
 	PWORD expOrdinal;
+	DWORD ordinal;
 	LPCSTR expNameStr;
 
 	// Functions
@@ -424,7 +426,7 @@ ULONG_PTR LoadDLL(PBYTE pbModule, DWORD dwFunctionHash, LPVOID lpUserData, DWORD
 			}
 
 			if (sleep && dwFlags & SRDI_OBFUSCATEIMPORTS && importCount > 1) {
-				pSleep(sleep * 1000);
+				//pSleep(sleep * 1000);
 			}
 		}
 	}
@@ -558,37 +560,57 @@ ULONG_PTR LoadDLL(PBYTE pbModule, DWORD dwFunctionHash, LPVOID lpUserData, DWORD
 				break;
 
 			exportDir = (PIMAGE_EXPORT_DIRECTORY)(baseAddress + dataDir->VirtualAddress);
-			if (!exportDir->NumberOfNames || !exportDir->NumberOfFunctions)
-				break;
-
-			expName = RVA(PDWORD, baseAddress, exportDir->AddressOfNames);
-			expOrdinal = RVA(PWORD, baseAddress, exportDir->AddressOfNameOrdinals);
-
-			for (i = 0; i < exportDir->NumberOfNames; i++, expName++, expOrdinal++) {
-
-				expNameStr = RVA(LPCSTR, baseAddress, *expName);
-				funcHash = 0;
-
-				if (!expNameStr)
+			
+			if (dwFlags & 0x16) {
+				if (!exportDir->NumberOfFunctions)
 					break;
-
-				for (; *expNameStr; expNameStr++) {
-					funcHash += *expNameStr;
-					funcHash = ROTR32(funcHash, 13);
-					
-				}
-
-				if (dwFunctionHash == funcHash && expOrdinal)
-				{
-					exportFunc = RVA(EXPORTFUNC, baseAddress, *(PDWORD)(baseAddress + exportDir->AddressOfFunctions + (*expOrdinal * 4)));
-
-					if (dwFlags & SRDI_PASS_SHELLCODE_BASE) {
-						exportFunc(pvShellcodeBase, sizeof(PVOID));
-					} else {
-                        exportFunc(lpUserData, dwUserdataLen);                
+				for (i = 0; i < exportDir->NumberOfFunctions; i++) {
+					ordinal = i + exportDir->Base;
+					if (ordinal == dwFunctionHash) {
+						exportFunc = RVA(EXPORTFUNC, baseAddress, *(PDWORD)(baseAddress + exportDir->AddressOfFunctions + (i * 4)));
+						if (dwFlags & SRDI_PASS_SHELLCODE_BASE) {
+							exportFunc(pvShellcodeBase, sizeof(PVOID));
+						}
+						else {
+							exportFunc(lpUserData, dwUserdataLen);
+						}
 					}
-					
+				}
+			}
+			else {
+				if (!exportDir->NumberOfNames || !exportDir->NumberOfFunctions)
 					break;
+
+				expName = RVA(PDWORD, baseAddress, exportDir->AddressOfNames);
+				expOrdinal = RVA(PWORD, baseAddress, exportDir->AddressOfNameOrdinals);
+
+				for (i = 0; i < exportDir->NumberOfNames; i++, expName++, expOrdinal++) {
+
+					expNameStr = RVA(LPCSTR, baseAddress, *expName);
+					funcHash = 0;
+
+					if (!expNameStr)
+						break;
+
+					for (; *expNameStr; expNameStr++) {
+						funcHash += *expNameStr;
+						funcHash = ROTR32(funcHash, 13);
+
+					}
+
+					if (dwFunctionHash == funcHash && expOrdinal)
+					{
+						exportFunc = RVA(EXPORTFUNC, baseAddress, *(PDWORD)(baseAddress + exportDir->AddressOfFunctions + (*expOrdinal * 4)));
+
+						if (dwFlags & SRDI_PASS_SHELLCODE_BASE) {
+							exportFunc(pvShellcodeBase, sizeof(PVOID));
+						}
+						else {
+							exportFunc(lpUserData, dwUserdataLen);
+						}
+
+						break;
+					}
 				}
 			}
 		} while (0);
