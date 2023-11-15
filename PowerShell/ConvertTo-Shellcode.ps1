@@ -125,12 +125,12 @@ public class sRDI
             newShellcode.Add(0xec);
             newShellcode.Add(6 * 8); // 32 bytes for shadow space + 8 bytes for last arg + 8 bytes for stack alignment
 
-            // mov qword ptr [rsp + 0x28], rcx (shellcode base) - Push in arg 5
+            // mov qword ptr [rsp + 0x20], rcx (shellcode base) - Push in arg 5
             newShellcode.Add(0x48);
             newShellcode.Add(0x89);
             newShellcode.Add(0x4C);
             newShellcode.Add(0x24);
-            newShellcode.Add(5 * 8);
+            newShellcode.Add(4 * 8);
 
             // Setup the location of the DLL into RCX
             // add rcx, <Offset of the DLL>
@@ -140,11 +140,11 @@ public class sRDI
             foreach (byte b in BitConverter.GetBytes(dllOffset))
                 newShellcode.Add(b);
 
-            // mov dword ptr [rsp + 0x20], <Flags> - Push arg 6 just above shadow space
+            // mov dword ptr [rsp + 0x28], <Flags> - Push arg 6 just above shadow space
             newShellcode.Add(0xc7);
             newShellcode.Add(0x44);
             newShellcode.Add(0x24);
-            newShellcode.Add(4 * 8);
+            newShellcode.Add(5 * 8);
             foreach (byte b in BitConverter.GetBytes((uint)flags))
                 newShellcode.Add(b);
 
