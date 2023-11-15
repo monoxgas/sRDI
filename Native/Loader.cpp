@@ -181,12 +181,12 @@ BOOL ConvertToShellcode(LPVOID inBytes, DWORD length, DWORD userFunction, LPVOID
 		bootstrap[i++] = 0xec;
 		bootstrap[i++] = 6 * 8; // 32 bytes for shadow space + 16 bytes for last args
 
-		// mov qword ptr [rsp + 0x28], rcx (shellcode base) - Push in arg 5
+		// mov qword ptr [rsp + 0x20], rcx (shellcode base) - Push in arg 5
 		bootstrap[i++] = 0x48;
 		bootstrap[i++] = 0x89;
 		bootstrap[i++] = 0x4C;
 		bootstrap[i++] = 0x24;
-		bootstrap[i++] = 5 * 8;
+		bootstrap[i++] = 4 * 8;
 
 		// add rcx, <Offset of the DLL>
 		bootstrap[i++] = 0x48;
@@ -195,11 +195,11 @@ BOOL ConvertToShellcode(LPVOID inBytes, DWORD length, DWORD userFunction, LPVOID
 		MoveMemory(bootstrap + i, &dllOffset, sizeof(dllOffset));
 		i += sizeof(dllOffset);
 
-		// mov dword ptr [rsp + 0x20], <Flags> - Push arg 6 just above shadow space
+		// mov dword ptr [rsp + 0x28], <Flags> - Push arg 6 just above shadow space
 		bootstrap[i++] = 0xC7;
 		bootstrap[i++] = 0x44;
 		bootstrap[i++] = 0x24;
-		bootstrap[i++] = 4 * 8;
+		bootstrap[i++] = 5 * 8;
 		MoveMemory(bootstrap + i, &flags, sizeof(flags));
 		i += sizeof(flags);
 

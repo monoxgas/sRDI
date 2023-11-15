@@ -106,17 +106,17 @@ def ConvertToShellcode(dllBytes, functionHash=0x10, userData=b'None', flags=0):
         bootstrap += b'\x48\x83\xec'
         bootstrap += b'\x30' # 32 bytes for shadow space + 16 bytes for last args
 
-        # mov qword ptr [rsp + 0x28], rcx (shellcode base) - Push in arg 5
+        # mov qword ptr [rsp + 0x20], rcx (shellcode base) - Push in arg 5
         bootstrap += b'\x48\x89\x4C\x24'
-        bootstrap += b'\x28'
+        bootstrap += b'\x20'
 
         # add rcx, <Offset of the DLL>
         bootstrap += b'\x48\x81\xc1'
         bootstrap += pack('I', dllOffset)
 
-        # mov dword ptr [rsp + 0x20], <Flags> - Push in arg 6 just above shadow space
+        # mov dword ptr [rsp + 0x28], <Flags> - Push in arg 6 just above shadow space
         bootstrap += b'\xC7\x44\x24'
-        bootstrap += b'\x20'
+        bootstrap += b'\x28'
         bootstrap += pack('I', flags)
 
         # call - Transfer execution to the RDI
